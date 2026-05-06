@@ -1,0 +1,112 @@
+<!-- Plugin Configuration File. Read more: https://plugins.jetbrains.com/docs/intellij/plugin-configuration-file.html -->
+<idea-plugin>
+    <id>com.sshdeploy.SshDeploy</id>
+    <name>SSH Deploy</name>
+    <vendor email="1320291471@qq.com" url="https://github.com/Linn-cn">SSH Deploy</vendor>
+
+    <description><![CDATA[
+    <p><b>English</b></p>
+    <p><b>SSH Deploy</b> uploads build artifacts to remote Linux hosts over <b>SSH</b> from IntelliJ IDEA.
+    It targets scenes that want a simple IDE-centric flow: configure servers and commands once, then upload from the tool window or a Run configuration.</p>
+
+    <p><b>Features</b></p>
+    <ul>
+        <li><b>SSH servers</b> — password or private key authentication.</li>
+        <li><b>Reusable commands</b> — save shell snippets and reuse them in deploy profiles or Run configurations.</li>
+        <li><b>Upload pipeline</b> — optional local build (Maven/Gradle), SFTP upload, remote commands <b>before</b> and <b>after</b> upload with streaming logs, optional <b>Terminal</b> tab for follow-up work.</li>
+        <li><b>Run/Debug configuration</b> — pick server, local artifact (file or directory + regex), remote directory, commands before/after upload, and an optional one-line terminal command sent after success.</li>
+        <li><b>Placeholders</b> — use <code>${fileName}</code> in remote commands for the uploaded file name (e.g. versioned JAR).</li>
+        <li><b>Import</b> — import <b>Alibaba Cloud Toolkit (ACT)</b> style XML to migrate faster.</li>
+        <li><b>Languages</b> — English and Simplified Chinese UI (follow IDE or override in Settings).</li>
+    </ul>
+
+    <p><b>How to use (Tool window)</b></p>
+    <ol>
+        <li>Open the <b>SSH Deploy</b> tool window (right tool window bar, or <b>View → Tool Windows</b>).</li>
+        <li>Under <b>Servers</b>, add SSH hosts. Credentials can use the IDE password safe.</li>
+        <li>Under <b>Commands</b>, add remote shell lines you reuse.</li>
+        <li>Under <b>Deploy</b>, create profiles linking server, upload mapping, and optional before/after commands or terminal.</li>
+        <li>Use <b>Deploy</b>, <b>Test connection</b>, or <b>Dry run</b>; follow logs in the Console tab.</li>
+    </ol>
+
+    <p><b>How to use (Run configuration)</b></p>
+    <ol>
+        <li><b>Run → Edit Configurations → + → SSH Deploy</b>.</li>
+        <li>Choose SSH server, local upload source, and remote upload directory.</li>
+        <li>Edit <b>before upload</b> and <b>after upload</b> commands (one per line). Use <b>insert placeholder</b> for <code>${fileName}</code> when needed.</li>
+        <li>Optionally set a single-line <b>terminal command</b>; after success the plugin opens Terminal and sends that line.</li>
+        <li>Run the configuration; logs appear in the Run tool window.</li>
+    </ol>
+
+    <p><b>Requirements</b>: IntelliJ IDEA with bundled Terminal and Java support. Remote hosts must support standard SSH/SFTP.</p>
+
+    <hr/>
+
+    <p><b>简体中文</b></p>
+    <p><b>SSH Deploy</b> 在 IntelliJ IDEA 中通过 <b>SSH</b> 将本地构建产物上传到远端 Linux 主机。
+    适合希望在 IDE 内完成配置与上传的场景：一次性配置服务器与命令，即可从工具窗口或「运行配置」触发上传流程。</p>
+
+    <p><b>功能说明</b></p>
+    <ul>
+        <li><b>SSH 服务器</b> — 支持密码或私钥认证。</li>
+        <li><b>可复用命令</b> — 保存常用 Shell 片段，在部署配置或运行配置中引用。</li>
+        <li><b>上传流水线</b> — 可选本地构建（Maven/Gradle）、SFTP 上传、<b>上传前/上传后</b>远程命令（流式日志），以及可选的 <b>Terminal</b> 后续操作。</li>
+        <li><b>运行/调试配置</b> — 选择服务器、本地上传源（指定文件或目录+正则）、远端目录、上传前后命令，以及可选的成功后单行终端命令。</li>
+        <li><b>占位符</b> — 远程命令中可使用 <code>${fileName}</code> 表示本次上传的文件名（例如带版本号的 JAR）。</li>
+        <li><b>导入</b> — 支持导入 <b>Alibaba Cloud Toolkit（ACT）</b> 风格的 XML，便于迁移。</li>
+        <li><b>语言</b> — 界面支持英文与简体中文（可跟随 IDE 或在设置中指定）。</li>
+    </ul>
+
+    <p><b>使用方式（工具窗口）</b></p>
+    <ol>
+        <li>打开 <b>SSH Deploy</b> 工具窗口（右侧工具窗口条，或通过 <b>视图 → 工具窗口</b>）。</li>
+        <li>在 <b>服务器</b> 中添加 SSH 主机；凭据可写入 IDE 密码保险箱。</li>
+        <li>在 <b>命令</b> 中维护可复用的远端 Shell 命令。</li>
+        <li>在 <b>部署</b> 中创建配置：关联服务器、上传映射，以及可选的上传前后命令或终端命令。</li>
+        <li>使用 <b>部署</b>、<b>测试连接</b> 或 <b>演练模式</b>；在 <b>控制台</b> 标签查看日志。</li>
+    </ol>
+
+    <p><b>使用方式（运行配置）</b></p>
+    <ol>
+        <li><b>运行 → 编辑配置 → + → SSH Deploy</b>。</li>
+        <li>选择 SSH 服务器、本地上传源与远端上传目录。</li>
+        <li>编辑 <b>上传前</b> 与 <b>上传后</b> 命令（每行一条）；需要时可使用 <b>插入占位符</b> 插入 <code>${fileName}</code>。</li>
+        <li>可选填写单行 <b>终端命令</b>；上传成功后插件会打开 Terminal 并自动发送该行。</li>
+        <li>运行该配置；日志显示在 <b>运行</b> 工具窗口中。</li>
+    </ol>
+
+    <p><b>环境要求</b>：需使用带内置 Terminal 与 Java 插件支持的 IntelliJ IDEA；远端需支持标准 SSH/SFTP。</p>
+    ]]></description>
+
+    <change-notes><![CDATA[
+    <b>1.0.0</b> — Initial release.<br>
+    <ul>
+        <li>Server / command / upload / deploy profile management</li>
+        <li>SSH connection with password and private key authentication</li>
+        <li>Deploy pipeline with build / upload / before / after / terminal stages</li>
+        <li>Dry-run and connection test modes</li>
+        <li>ToolWindow deploy panel with real-time logs</li>
+        <li>Run/Debug configuration for deployment</li>
+        <li>ACT configuration import</li>
+        <li>i18n support</li>
+    </ul>
+    ]]></change-notes>
+
+    <depends>com.intellij.java</depends>
+    <depends>org.jetbrains.plugins.terminal</depends>
+
+    <resource-bundle>messages.MyMessageBundle</resource-bundle>
+
+    <extensions defaultExtensionNs="com.intellij">
+        <toolWindow id="SshDeploy" factoryClass="com.sshdeploy.MyToolWindowFactory"
+                    anchor="right"
+                    icon="/icons/ssh_deploy.svg"/>
+        <configurationType implementation="com.sshdeploy.deploy.run.ServerDeployRunConfigurationType"/>
+        <applicationConfigurable
+                id="com.sshdeploy.serverdeploy.settings"
+                displayName="SSH Deploy"
+                parentId="tools"
+                instance="com.sshdeploy.deploy.settings.ServerDeploySettingsConfigurable"/>
+        <notificationGroup id="SSH Deploy Notifications" displayType="BALLOON" isLogByDefault="true"/>
+    </extensions>
+</idea-plugin>

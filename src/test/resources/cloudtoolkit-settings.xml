@@ -1,0 +1,395 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- 测试夹具：虚构数据，密码与地址均为 RFC5737 文档网段 / 占位符，勿用于真实环境 -->
+<cloudToolkitSettings>
+  <database>
+    <tag>
+      <tag>
+        <id>1</id>
+        <name>标签组-Alpha</name>
+      </tag>
+      <tag>
+        <id>2</id>
+        <name>标签组-Beta</name>
+      </tag>
+      <tag>
+        <id>4</id>
+        <name>标签组-Gamma</name>
+      </tag>
+      <tag>
+        <id>5</id>
+        <name>标签组-Delta</name>
+      </tag>
+      <tag>
+        <id>6</id>
+        <name>标签组-Epsilon</name>
+      </tag>
+      <tag>
+        <id>7</id>
+        <name>标签组-Zeta</name>
+      </tag>
+      <tag>
+        <id>8</id>
+        <name>标签组-Eta</name>
+      </tag>
+      <tag>
+        <id>9</id>
+        <name>标签组-Theta</name>
+      </tag>
+      <tag>
+        <id>10</id>
+        <name>标签组-Iota</name>
+      </tag>
+    </tag>
+    <profile>
+      <profile>
+        <id>2</id>
+        <name>测试凭证配置-A</name>
+        <user>testuser</user>
+        <password>TestOnly_Password_A</password>
+        <privateKey />
+        <keyphrase />
+      </profile>
+      <profile>
+        <id>3</id>
+        <name>测试凭证配置-B</name>
+        <user>testuser</user>
+        <password>TestOnly_Password_B</password>
+        <privateKey />
+        <keyphrase />
+      </profile>
+      <profile>
+        <id>4</id>
+        <name>测试凭证配置-C</name>
+        <user>appuser</user>
+        <password>TestOnly_Password_C</password>
+        <privateKey />
+        <keyphrase />
+      </profile>
+      <profile>
+        <id>6</id>
+        <name>测试凭证配置-D</name>
+        <user>root</user>
+        <password>TestOnly_Password_D</password>
+        <privateKey />
+        <keyphrase />
+      </profile>
+      <profile>
+        <id>7</id>
+        <name>测试凭证配置-E</name>
+        <user>root</user>
+        <password>TestOnly_Password_E</password>
+        <privateKey />
+        <keyphrase />
+      </profile>
+    </profile>
+    <command>
+      <command>
+        <id>45</id>
+        <content><![CDATA[Command:systemctl restart acme-standard.service Directory:/]]></content>
+        <digest>11111111111111111111111111111111</digest>
+      </command>
+      <command>
+        <id>46</id>
+        <content><![CDATA[systemctl restart acme-standard.service]]></content>
+        <digest>22222222222222222222222222222222</digest>
+      </command>
+      <command>
+        <id>47</id>
+        <content><![CDATA[Command:systemctl restart acme-file.service Directory:/]]></content>
+        <digest>33333333333333333333333333333333</digest>
+      </command>
+      <command>
+        <id>48</id>
+        <content><![CDATA[Command:systemctl restart acme-system.service Directory:/]]></content>
+        <digest>44444444444444444444444444444444</digest>
+      </command>
+      <command>
+        <id>49</id>
+        <content><![CDATA[Command:systemctl restart acme-auth.service Directory:/]]></content>
+        <digest>55555555555555555555555555555555</digest>
+      </command>
+      <command>
+        <id>50</id>
+        <content><![CDATA[Command:systemctl restart acme-flow.service Directory:/]]></content>
+        <digest>66666666666666666666666666666666</digest>
+      </command>
+      <command>
+        <id>51</id>
+        <content><![CDATA[Command:systemctl restart acme-gateway.service Directory:/]]></content>
+        <digest>77777777777777777777777777777777</digest>
+      </command>
+      <command>
+        <id>52</id>
+        <content><![CDATA[Command:systemctl restart acme-info.service Directory:/]]></content>
+        <digest>88888888888888888888888888888888</digest>
+      </command>
+      <command>
+        <id>53</id>
+        <content><![CDATA[systemctl restart acme-file.service]]></content>
+        <digest>99999999999999999999999999999999</digest>
+      </command>
+      <command>
+        <id>54</id>
+        <content><![CDATA[systemctl restart acme-system.service]]></content>
+        <digest>aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa</digest>
+      </command>
+      <command>
+        <id>55</id>
+        <content><![CDATA[systemctl restart acme-auth.service]]></content>
+        <digest>bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb</digest>
+      </command>
+      <command>
+        <id>56</id>
+        <content><![CDATA[systemctl restart acme-flow.service]]></content>
+        <digest>cccccccccccccccccccccccccccccccc</digest>
+      </command>
+      <command>
+        <id>57</id>
+        <content><![CDATA[systemctl restart acme-info.service]]></content>
+        <digest>dddddddddddddddddddddddddddddddd</digest>
+      </command>
+      <command>
+        <id>58</id>
+        <content><![CDATA[systemctl restart acme-gateway.service]]></content>
+        <digest>eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee</digest>
+      </command>
+      <command>
+        <id>59</id>
+        <content><![CDATA[systemctl restart acme-drill.service]]></content>
+        <digest>ffffffffffffffffffffffffffffffff</digest>
+      </command>
+      <command>
+        <id>60</id>
+        <content><![CDATA[systemctl restart acme-notify.service]]></content>
+        <digest>10101010101010101010101010101010</digest>
+      </command>
+      <command>
+        <id>61</id>
+        <content><![CDATA[systemctl restart acme-message.service]]></content>
+        <digest>20202020202020202020202020202020</digest>
+      </command>
+      <command>
+        <id>62</id>
+        <content><![CDATA[systemctl restart acme-risk.service]]></content>
+        <digest>30303030303030303030303030303030</digest>
+      </command>
+      <command>
+        <id>63</id>
+        <content><![CDATA[sh /opt/testapp/service-bird/restart.sh]]></content>
+        <digest>40404040404040404040404040404040</digest>
+      </command>
+      <command>
+        <id>64</id>
+        <content><![CDATA[systemctl restart acme-safe-harbor.service]]></content>
+        <digest>50505050505050505050505050505050</digest>
+      </command>
+      <command>
+        <id>65</id>
+        <content><![CDATA[sh /opt/testapp/service-auth/restart.sh]]></content>
+        <digest>60606060606060606060606060606060</digest>
+      </command>
+      <command>
+        <id>66</id>
+        <content><![CDATA[sh /opt/testapp/service-knowledge/restart.sh]]></content>
+        <digest>70707070707070707070707070707070</digest>
+      </command>
+      <command>
+        <id>67</id>
+        <content><![CDATA[systemctl restart acme-flight-zone.service]]></content>
+        <digest>80808080808080808080808080808080</digest>
+      </command>
+      <command>
+        <id>68</id>
+        <content><![CDATA[sudo systemctl restart demo-eco-system.service]]></content>
+        <digest>90909090909090909090909090909090</digest>
+      </command>
+      <command>
+        <id>69</id>
+        <content><![CDATA[sh /opt/testapp/service-view-auth/restart.sh]]></content>
+        <digest>a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0</digest>
+      </command>
+      <command>
+        <id>70</id>
+        <content><![CDATA[echo "TestOnlySecret" | /opt/testapp/backend/restart.sh]]></content>
+        <digest>b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0</digest>
+      </command>
+      <command>
+        <id>71</id>
+        <content><![CDATA[sh /opt/testapp/service-auth-v43/restart.sh]]></content>
+        <digest>c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0</digest>
+      </command>
+      <command>
+        <id>72</id>
+        <content><![CDATA[systemctl restart acme-backend.service]]></content>
+        <digest>d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0</digest>
+      </command>
+      <command>
+        <id>73</id>
+        <content><![CDATA[echo "TestOnlySecret2" | /opt/testapp/backend/restart.sh]]></content>
+        <digest>e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0</digest>
+      </command>
+    </command>
+    <host>
+      <host>
+        <id>1</id>
+        <address>192.0.2.1</address>
+        <port>22</port>
+        <hostType>0</hostType>
+        <profileId>0</profileId>
+        <tagId>1</tagId>
+        <proxyId>0</proxyId>
+        <remark>测试主机-01</remark>
+      </host>
+      <host>
+        <id>2</id>
+        <address>192.0.2.2</address>
+        <port>22</port>
+        <hostType>0</hostType>
+        <profileId>2</profileId>
+        <tagId>1</tagId>
+        <proxyId>0</proxyId>
+        <remark>测试主机-02</remark>
+      </host>
+      <host>
+        <id>3</id>
+        <address>192.0.2.3</address>
+        <port>22</port>
+        <hostType>0</hostType>
+        <profileId>3</profileId>
+        <tagId>2</tagId>
+        <proxyId>0</proxyId>
+        <remark>测试主机-03</remark>
+      </host>
+      <host>
+        <id>4</id>
+        <address>192.0.2.4</address>
+        <port>22</port>
+        <hostType>0</hostType>
+        <profileId>3</profileId>
+        <tagId>2</tagId>
+        <proxyId>0</proxyId>
+        <remark>测试主机-04</remark>
+      </host>
+      <host>
+        <id>5</id>
+        <address>192.0.2.5</address>
+        <port>22</port>
+        <hostType>0</hostType>
+        <profileId>3</profileId>
+        <tagId>2</tagId>
+        <proxyId>0</proxyId>
+        <remark>测试主机-05</remark>
+      </host>
+      <host>
+        <id>6</id>
+        <address>192.0.2.6</address>
+        <port>22</port>
+        <hostType>0</hostType>
+        <profileId>3</profileId>
+        <tagId>1</tagId>
+        <proxyId>0</proxyId>
+        <remark>测试主机-06</remark>
+      </host>
+      <host>
+        <id>7</id>
+        <address>192.0.2.7</address>
+        <port>22</port>
+        <hostType>0</hostType>
+        <profileId>3</profileId>
+        <tagId>2</tagId>
+        <proxyId>0</proxyId>
+        <remark>测试主机-07</remark>
+      </host>
+      <host>
+        <id>8</id>
+        <address>192.0.2.8</address>
+        <port>22</port>
+        <hostType>0</hostType>
+        <profileId>3</profileId>
+        <tagId>2</tagId>
+        <proxyId>0</proxyId>
+        <remark>测试主机-08</remark>
+      </host>
+      <host>
+        <id>9</id>
+        <address>198.51.100.10</address>
+        <port>22</port>
+        <hostType>0</hostType>
+        <profileId>4</profileId>
+        <tagId>10</tagId>
+        <proxyId>0</proxyId>
+        <remark>测试主机-09</remark>
+      </host>
+      <host>
+        <id>10</id>
+        <address>198.51.100.11</address>
+        <port>22</port>
+        <hostType>0</hostType>
+        <profileId>4</profileId>
+        <tagId>8</tagId>
+        <proxyId>0</proxyId>
+        <remark>测试主机-10</remark>
+      </host>
+      <host>
+        <id>11</id>
+        <address>198.51.100.12</address>
+        <port>22</port>
+        <hostType>0</hostType>
+        <profileId>3</profileId>
+        <tagId>2</tagId>
+        <proxyId>0</proxyId>
+        <remark />
+      </host>
+      <host>
+        <id>12</id>
+        <address>203.0.113.20</address>
+        <port>22</port>
+        <hostType>0</hostType>
+        <profileId>0</profileId>
+        <tagId>4</tagId>
+        <proxyId>0</proxyId>
+        <remark />
+      </host>
+      <host>
+        <id>13</id>
+        <address>203.0.113.21</address>
+        <port>1901</port>
+        <hostType>0</hostType>
+        <profileId>6</profileId>
+        <tagId>6</tagId>
+        <proxyId>0</proxyId>
+        <remark />
+      </host>
+      <host>
+        <id>14</id>
+        <address>203.0.113.22</address>
+        <port>22</port>
+        <hostType>0</hostType>
+        <profileId>4</profileId>
+        <tagId>9</tagId>
+        <proxyId>0</proxyId>
+        <remark>测试主机-14</remark>
+      </host>
+      <host>
+        <id>15</id>
+        <address>203.0.113.23</address>
+        <port>18888</port>
+        <hostType>0</hostType>
+        <profileId>7</profileId>
+        <tagId>7</tagId>
+        <proxyId>0</proxyId>
+        <remark />
+      </host>
+    </host>
+    <dockerRegistry />
+  </database>
+  <ideaSettings>
+    <account />
+    <regionId>cn-example-test</regionId>
+    <sshLibrary>SSHJ</sshLibrary>
+    <uploadModel />
+    <runConfiguration><![CDATA[<root>
+</root>]]></runConfiguration>
+    <debug>false</debug>
+  </ideaSettings>
+</cloudToolkitSettings>

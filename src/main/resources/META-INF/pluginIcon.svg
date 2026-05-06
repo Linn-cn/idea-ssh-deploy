@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 40 40" fill="none">
+  <title>SSH Deploy</title>
+  <rect width="40" height="40" rx="8" fill="#2563EB"/>
+  <!-- Local terminal -->
+  <rect x="5" y="10" width="12" height="20" rx="2" stroke="#fff" stroke-width="1.6" fill="none"/>
+  <path d="M8.5 15.5l2.5 2-2.5 2" stroke="#BFDBFE" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+  <line x1="8.5" y1="22" x2="14" y2="22" stroke="#BFDBFE" stroke-width="1.2" stroke-linecap="round"/>
+  <!-- Secure link + forward (SSH) -->
+  <path d="M18 20h5" stroke="#93C5FD" stroke-width="2.2" stroke-linecap="round"/>
+  <circle cx="21.5" cy="20" r="2.3" fill="#FBBF24" stroke="#fff" stroke-width="0.8"/>
+  <path d="M22 20l4 2.5v-5L22 20z" fill="#fff"/>
+  <!-- Remote server -->
+  <rect x="27" y="9" width="10" height="22" rx="2" fill="#fff" fill-opacity="0.22" stroke="#fff" stroke-width="1.5"/>
+  <line x1="29.5" y1="13.5" x2="34.5" y2="13.5" stroke="#fff" stroke-width="1.2"/>
+  <line x1="29.5" y1="17.5" x2="34.5" y2="17.5" stroke="#fff" stroke-width="1.2"/>
+  <line x1="29.5" y1="21.5" x2="34.5" y2="21.5" stroke="#fff" stroke-width="1.2"/>
+  <!-- Upload / deploy -->
+  <path d="M21 5v6M18 8l3-3 3 3" stroke="#FDE68A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
