@@ -11,11 +11,15 @@ import com.sshdeploy.deploy.remote.RemoteCredentials;
 import com.sshdeploy.deploy.security.CredentialRefManager;
 import com.sshdeploy.deploy.security.CredentialStore;
 import com.sshdeploy.deploy.storage.DeployPluginStateService;
+import com.sshdeploy.deploy.ui.common.MasterCheckboxColumnHeaderSupport;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.ui.Messages;
 import com.intellij.ui.components.JBScrollPane;
+import com.intellij.util.ui.JBUI;
 
 import javax.swing.AbstractCellEditor;
+import javax.swing.Box;
+import javax.swing.DefaultCellEditor;
 import javax.swing.JButton;
 import javax.swing.JCheckBox;
 import javax.swing.JComboBox;
@@ -32,6 +36,8 @@ import javax.swing.UIManager;
 import javax.swing.table.TableCellEditor;
 import javax.swing.table.TableCellRenderer;
 import javax.swing.table.DefaultTableModel;
+import java.util.ArrayList;
+import java.util.List;
 import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Component;
@@ -50,23 +56,37 @@ public final class ServerManagementPanel extends JPanel {
     private final JTable table;
     private final JTextField nameSearchField;
     private final JTextField hostSearchField;
+    /** Row index in the table → server id (same order as {@link #refreshTable}) */
+    private final List<String> visibleServerIds = new ArrayList<>();
 
     public ServerManagementPanel(DeployPluginStateService stateService, CredentialStore credentialStore) {
         super(new BorderLayout());
         this.stateService = stateService;
         this.credentialStore = credentialStore;
         this.tableModel = new DefaultTableModel(new Object[]{
+                MyMessageBundle.message("server.manager.col.select"),
                 MyMessageBundle.message("server.manager.col.name"),
                 MyMessageBundle.message("server.manager.col.host"),
                 MyMessageBundle.message("server.manager.col.port"),
                 MyMessageBundle.message("server.manager.col.user"),
                 MyMessageBundle.message("server.manager.col.password"),
                 MyMessageBundle.message("server.manager.col.operation")
-        }, 0);
+        }, 0) {
+            @Override
+            public Class<?> getColumnClass(int columnIndex) {
+                if (columnIndex == 0) {
+                    return Boolean.class;
+                }
+                if (columnIndex == 3) {
+                    return Integer.class;
+                }
+                return Object.class;
+            }
+        };
         this.table = new JTable(tableModel) {
             @Override
             public boolean isCellEditable(int row, int column) {
-                return column == 5;
+                return column == 0 || column == 6;
             }
         };
         this.table.setRowSelectionAllowed(false);
@@ -88,31 +108,44 @@ public final class ServerManagementPanel extends JPanel {
         gbc.gridy = 0;
         topPanel.add(new JLabel(MyMessageBundle.message("server.manager.search.name")), gbc);
         gbc.gridx = 1;
-        gbc.weightx = 1;
+        gbc.weightx = 0;
         topPanel.add(nameSearchField, gbc);
         gbc.gridx = 2;
         gbc.weightx = 0;
         topPanel.add(new JLabel(MyMessageBundle.message("server.manager.search.host")), gbc);
         gbc.gridx = 3;
-        gbc.weightx = 1;
+        gbc.weightx = 0;
         topPanel.add(hostSearchField, gbc);
+        applyCompactSearchField(nameSearchField);
+        applyCompactSearchField(hostSearchField);
         gbc.gridx = 4;
+        gbc.weightx = 1;
+        gbc.fill = GridBagConstraints.HORIZONTAL;
+        topPanel.add(Box.createHorizontalGlue(), gbc);
+        gbc.fill = GridBagConstraints.HORIZONTAL;
+        gbc.gridx = 5;
         gbc.weightx = 0;
         JButton searchButton = new JButton(MyMessageBundle.message("server.manager.searchBtn"));
         JButton resetButton = new JButton(MyMessageBundle.message("server.manager.search.reset"));
         JButton addButton = new JButton(MyMessageBundle.message("server.manager.add"));
         topPanel.add(searchButton, gbc);
-        gbc.gridx = 5;
-        topPanel.add(resetButton, gbc);
         gbc.gridx = 6;
+        topPanel.add(resetButton, gbc);
+        gbc.gridx = 7;
         topPanel.add(addButton, gbc);
+        gbc.gridx = 8;
+        JButton batchDeleteButton = new JButton(MyMessageBundle.message("server.manager.batchDelete"));
+        topPanel.add(batchDeleteButton, gbc);
         add(topPanel, BorderLayout.NORTH);
         add(new JBScrollPane(table), BorderLayout.CENTER);
         setBorder(javax.swing.BorderFactory.createEmptyBorder(6, 8, 6, 8));
 
         configureTableAppearance();
-        table.getColumnModel().getColumn(5).setCellRenderer(new OperationCellRenderer());
-        table.getColumnModel().getColumn(5).setCellEditor(new OperationCellEditor());
+        JCheckBox headerCheckPrototype = new JCheckBox();
+        headerCheckPrototype.setHorizontalAlignment(SwingConstants.CENTER);
+        table.getColumnModel().getColumn(0).setCellEditor(new DefaultCellEditor(headerCheckPrototype));
+        table.getColumnModel().getColumn(6).setCellRenderer(new OperationCellRenderer());
+        table.getColumnModel().getColumn(6).setCellEditor(new OperationCellEditor());
 
         searchButton.addActionListener(e -> refreshTable());
         resetButton.addActionListener(e -> {
@@ -121,6 +154,7 @@ public final class ServerManagementPanel extends JPanel {
             refreshTable();
         });
         addButton.addActionListener(e -> openEditDialog(null));
+        batchDeleteButton.addActionListener(e -> batchDeleteSelectedServers());
         refreshTable();
     }
 
@@ -135,6 +169,7 @@ public final class ServerManagementPanel extends JPanel {
     private void refreshTable() {
         String nameKeyword = nameSearchField.getText().trim().toLowerCase();
         String hostKeyword = hostSearchField.getText().trim().toLowerCase();
+        visibleServerIds.clear();
         tableModel.setRowCount(0);
         for (ServerProfile profile : stateService.getServers()) {
             if (!contains(profile.getName(), nameKeyword)) {
@@ -143,8 +178,10 @@ public final class ServerManagementPanel extends JPanel {
             if (!contains(profile.getHost(), hostKeyword)) {
                 continue;
             }
+            visibleServerIds.add(profile.getId());
             String password = profile.getCredentialRef() == null ? "" : Objects.toString(credentialStore.readPassword(profile.getCredentialRef()), "");
             tableModel.addRow(new Object[]{
+                    Boolean.FALSE,
                     profile.getName(),
                     profile.getHost(),
                     profile.getPort(),
@@ -155,17 +192,48 @@ public final class ServerManagementPanel extends JPanel {
         }
     }
 
-    private ServerProfile serverAtRow(int row) {
-        if (row < 0 || row >= tableModel.getRowCount()) {
-            return null;
-        }
-        String name = Objects.toString(tableModel.getValueAt(row, 0), "");
-        for (ServerProfile profile : stateService.getServers()) {
-            if (name.equals(profile.getName())) {
-                return profile;
+    private void batchDeleteSelectedServers() {
+        List<String> ids = new ArrayList<>();
+        for (int r = 0; r < tableModel.getRowCount(); r++) {
+            if (Boolean.TRUE.equals(tableModel.getValueAt(r, 0))) {
+                ids.add(visibleServerIds.get(r));
             }
         }
-        return null;
+        if (ids.isEmpty()) {
+            JOptionPane.showMessageDialog(
+                    this,
+                    MyMessageBundle.message("server.manager.batchDelete.none"),
+                    MyMessageBundle.message("server.manager.batchDelete"),
+                    JOptionPane.INFORMATION_MESSAGE);
+            return;
+        }
+        int confirm = JOptionPane.showConfirmDialog(
+                this,
+                MyMessageBundle.message("server.manager.confirm.batchDelete", ids.size()),
+                MyMessageBundle.message("server.manager.batchDelete"),
+                JOptionPane.OK_CANCEL_OPTION,
+                JOptionPane.WARNING_MESSAGE);
+        if (confirm != JOptionPane.OK_OPTION) {
+            return;
+        }
+        for (String id : ids) {
+            ServerProfile profile = stateService.findServerById(id).orElse(null);
+            if (profile == null) {
+                continue;
+            }
+            stateService.deleteServerById(id);
+            if (profile.getCredentialRef() != null && !profile.getCredentialRef().isBlank()) {
+                credentialStore.delete(profile.getCredentialRef());
+            }
+        }
+        refreshTable();
+    }
+
+    private ServerProfile serverAtRow(int row) {
+        if (row < 0 || row >= visibleServerIds.size()) {
+            return null;
+        }
+        return stateService.findServerById(visibleServerIds.get(row)).orElse(null);
     }
 
     private static int parsePort(String text) {
@@ -186,12 +254,14 @@ public final class ServerManagementPanel extends JPanel {
     private void configureTableAppearance() {
         table.setRowHeight(44);
         table.setAutoResizeMode(JTable.AUTO_RESIZE_ALL_COLUMNS);
-        table.getColumnModel().getColumn(0).setPreferredWidth(160);
-        table.getColumnModel().getColumn(1).setPreferredWidth(220);
-        table.getColumnModel().getColumn(2).setPreferredWidth(80);
-        table.getColumnModel().getColumn(3).setPreferredWidth(140);
-        table.getColumnModel().getColumn(4).setPreferredWidth(180);
-        table.getColumnModel().getColumn(5).setPreferredWidth(220);
+        table.getColumnModel().getColumn(0).setPreferredWidth(JBUI.scale(44));
+        table.getColumnModel().getColumn(0).setMaxWidth(JBUI.scale(56));
+        table.getColumnModel().getColumn(1).setPreferredWidth(160);
+        table.getColumnModel().getColumn(2).setPreferredWidth(220);
+        table.getColumnModel().getColumn(3).setPreferredWidth(80);
+        table.getColumnModel().getColumn(4).setPreferredWidth(140);
+        table.getColumnModel().getColumn(5).setPreferredWidth(180);
+        table.getColumnModel().getColumn(6).setPreferredWidth(220);
         table.getTableHeader().setReorderingAllowed(false);
         table.setIntercellSpacing(new java.awt.Dimension(8, 4));
         table.setShowGrid(false);
@@ -199,12 +269,12 @@ public final class ServerManagementPanel extends JPanel {
         javax.swing.table.DefaultTableCellRenderer leftCellRenderer = new javax.swing.table.DefaultTableCellRenderer();
         leftCellRenderer.setHorizontalAlignment(SwingConstants.LEFT);
         leftCellRenderer.setBorder(javax.swing.BorderFactory.createEmptyBorder(0, 6, 0, 0));
-        for (int i = 0; i < 5; i++) {
+        for (int i = 1; i < 6; i++) {
             table.getColumnModel().getColumn(i).setCellRenderer(leftCellRenderer);
         }
 
         TableCellRenderer headerRenderer = table.getTableHeader().getDefaultRenderer();
-        for (int i = 0; i < table.getColumnModel().getColumnCount(); i++) {
+        for (int i = 1; i < table.getColumnModel().getColumnCount(); i++) {
             table.getColumnModel().getColumn(i).setHeaderRenderer((tbl, value, selected, focus, row, column) -> {
                 Component component = headerRenderer.getTableCellRendererComponent(tbl, value, selected, focus, row, column);
                 if (component instanceof JLabel label) {
@@ -214,6 +284,11 @@ public final class ServerManagementPanel extends JPanel {
                 return component;
             });
         }
+        MasterCheckboxColumnHeaderSupport.install(
+                table,
+                0,
+                headerRenderer,
+                MyMessageBundle.message("server.manager.header.masterSelect.tooltip"));
     }
 
     private record ServerSelectItem(String id, String name) {
@@ -221,10 +296,6 @@ public final class ServerManagementPanel extends JPanel {
         public String toString() {
             return name;
         }
-    }
-
-    private interface RowAction {
-        void run(int row);
     }
 
     private final class OperationCellEditor extends AbstractCellEditor implements TableCellEditor {
@@ -338,7 +409,6 @@ public final class ServerManagementPanel extends JPanel {
             GridBagConstraints gbc = new GridBagConstraints();
             gbc.insets = new Insets(4, 4, 2, 4);
             gbc.fill = GridBagConstraints.HORIZONTAL;
-            gbc.weightx = 0;
             int row = 0;
             addField(form, gbc, row++, MyMessageBundle.message("server.manager.col.name"), nameField, nameError);
             addField(form, gbc, row++, MyMessageBundle.message("server.manager.col.host"), hostField, hostError);
@@ -380,13 +450,19 @@ public final class ServerManagementPanel extends JPanel {
             }
 
             applyIdeaFont(nameField, hostField, portField, userField, passwordField);
+            applyGrowableFormField(nameField);
+            applyGrowableFormField(hostField);
+            applyGrowableFormField(userField);
+            applyGrowableFormField(passwordField);
+            applyCompactPortField(portField);
+            applyGrowableFormField(reusePasswordServerCombo);
 
             testBtn.addActionListener(e -> testConnectionFromDialog());
             saveBtn.addActionListener(e -> saveServer());
             cancelBtn.addActionListener(e -> dispose());
 
-            setSize(480, 460);
-            setMinimumSize(new java.awt.Dimension(480, 520));
+            setMinimumSize(new java.awt.Dimension(JBUI.scale(420), JBUI.scale(400)));
+            setSize(JBUI.scale(520), JBUI.scale(480));
             setLocationRelativeTo(SwingUtilities.getWindowAncestor(ServerManagementPanel.this));
         }
 
@@ -537,15 +613,22 @@ public final class ServerManagementPanel extends JPanel {
                               JLabel error) {
             gbc.gridx = 0;
             gbc.gridy = row * 2;
+            gbc.gridwidth = 1;
             gbc.weightx = 0;
+            gbc.weighty = 0;
+            gbc.fill = GridBagConstraints.NONE;
+            gbc.anchor = GridBagConstraints.WEST;
             form.add(new JLabel(title), gbc);
             gbc.gridx = 1;
             gbc.weightx = 1;
+            gbc.fill = GridBagConstraints.HORIZONTAL;
             form.add(input, gbc);
 
             gbc.gridx = 1;
             gbc.gridy = row * 2 + 1;
+            gbc.gridwidth = 1;
             gbc.weightx = 1;
+            gbc.fill = GridBagConstraints.HORIZONTAL;
             gbc.insets = new Insets(0, 4, 6, 4);
             form.add(error, gbc);
             gbc.insets = new Insets(4, 4, 2, 4);
@@ -560,5 +643,40 @@ public final class ServerManagementPanel extends JPanel {
         for (JComponent component : components) {
             component.setFont(font);
         }
+    }
+
+    private static void applyCompactSearchField(JTextField field) {
+        int minW = JBUI.scale(100);
+        int prefW = JBUI.scale(180);
+        java.awt.Dimension h = field.getPreferredSize();
+        field.setMinimumSize(new java.awt.Dimension(minW, h.height));
+        field.setPreferredSize(new java.awt.Dimension(prefW, h.height));
+        field.setMaximumSize(new java.awt.Dimension(prefW + JBUI.scale(40), h.height));
+    }
+
+    private static void applyCompactFormField(JComponent field) {
+        int minW = JBUI.scale(100);
+        int prefW = JBUI.scale(200);
+        java.awt.Dimension h = field.getPreferredSize();
+        field.setMinimumSize(new java.awt.Dimension(minW, h.height));
+        field.setPreferredSize(new java.awt.Dimension(prefW, h.height));
+        field.setMaximumSize(new java.awt.Dimension(prefW + JBUI.scale(40), h.height));
+    }
+
+    /** Wider minimum, no max width cap so fields grow with the dialog. */
+    private static void applyGrowableFormField(JComponent field) {
+        int minW = JBUI.scale(220);
+        java.awt.Dimension h = field.getPreferredSize();
+        field.setMinimumSize(new java.awt.Dimension(minW, h.height));
+        field.setPreferredSize(null);
+        field.setMaximumSize(new java.awt.Dimension(Integer.MAX_VALUE, h.height));
+    }
+
+    private static void applyCompactPortField(JTextField portField) {
+        int w = JBUI.scale(72);
+        java.awt.Dimension h = portField.getPreferredSize();
+        portField.setMinimumSize(new java.awt.Dimension(w, h.height));
+        portField.setPreferredSize(new java.awt.Dimension(w, h.height));
+        portField.setMaximumSize(new java.awt.Dimension(JBUI.scale(90), h.height));
     }
 }

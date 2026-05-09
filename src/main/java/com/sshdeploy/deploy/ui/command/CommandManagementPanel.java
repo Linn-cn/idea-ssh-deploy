@@ -3,10 +3,15 @@ package com.sshdeploy.deploy.ui.command;
 import com.sshdeploy.MyMessageBundle;
 import com.sshdeploy.deploy.domain.CommandTemplate;
 import com.sshdeploy.deploy.storage.DeployPluginStateService;
+import com.sshdeploy.deploy.ui.common.MasterCheckboxColumnHeaderSupport;
 import com.intellij.ui.components.JBScrollPane;
+import com.intellij.util.ui.JBUI;
 
 import javax.swing.AbstractCellEditor;
+import javax.swing.Box;
+import javax.swing.DefaultCellEditor;
 import javax.swing.JButton;
+import javax.swing.JCheckBox;
 import javax.swing.JComponent;
 import javax.swing.JDialog;
 import javax.swing.JLabel;
@@ -29,6 +34,8 @@ import java.awt.FlowLayout;
 import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
 import java.awt.Insets;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Objects;
 
 public final class CommandManagementPanel extends JPanel {
@@ -36,19 +43,29 @@ public final class CommandManagementPanel extends JPanel {
     private final DefaultTableModel tableModel;
     private final JTable table;
     private final JTextField nameSearchField;
+    private final List<String> visibleCommandIds = new ArrayList<>();
 
     public CommandManagementPanel(DeployPluginStateService stateService) {
         super(new BorderLayout());
         this.stateService = stateService;
         this.tableModel = new DefaultTableModel(new Object[]{
+                MyMessageBundle.message("command.manager.col.select"),
                 MyMessageBundle.message("command.manager.col.name"),
                 MyMessageBundle.message("command.manager.col.command"),
                 MyMessageBundle.message("command.manager.col.operation")
-        }, 0);
+        }, 0) {
+            @Override
+            public Class<?> getColumnClass(int columnIndex) {
+                if (columnIndex == 0) {
+                    return Boolean.class;
+                }
+                return Object.class;
+            }
+        };
         this.table = new JTable(tableModel) {
             @Override
             public boolean isCellEditable(int row, int column) {
-                return column == 2;
+                return column == 0 || column == 3;
             }
         };
         table.setRowSelectionAllowed(false);
@@ -69,26 +86,38 @@ public final class CommandManagementPanel extends JPanel {
         gbc.gridy = 0;
         topPanel.add(new JLabel(MyMessageBundle.message("command.manager.search.name")), gbc);
         gbc.gridx = 1;
-        gbc.weightx = 1;
+        gbc.weightx = 0;
         topPanel.add(nameSearchField, gbc);
+        applyCompactSearchField(nameSearchField);
         gbc.gridx = 2;
+        gbc.weightx = 1;
+        gbc.fill = GridBagConstraints.HORIZONTAL;
+        topPanel.add(Box.createHorizontalGlue(), gbc);
+        gbc.fill = GridBagConstraints.HORIZONTAL;
+        gbc.gridx = 3;
         gbc.weightx = 0;
         JButton searchButton = new JButton(MyMessageBundle.message("command.manager.searchBtn"));
         JButton resetButton = new JButton(MyMessageBundle.message("command.manager.search.reset"));
         JButton addButton = new JButton(MyMessageBundle.message("command.manager.add"));
         topPanel.add(searchButton, gbc);
-        gbc.gridx = 3;
-        topPanel.add(resetButton, gbc);
         gbc.gridx = 4;
+        topPanel.add(resetButton, gbc);
+        gbc.gridx = 5;
         topPanel.add(addButton, gbc);
+        gbc.gridx = 6;
+        JButton batchDeleteButton = new JButton(MyMessageBundle.message("command.manager.batchDelete"));
+        topPanel.add(batchDeleteButton, gbc);
         add(topPanel, BorderLayout.NORTH);
 
         add(new JBScrollPane(table), BorderLayout.CENTER);
         setBorder(javax.swing.BorderFactory.createEmptyBorder(6, 8, 6, 8));
 
         configureTableAppearance();
-        table.getColumnModel().getColumn(2).setCellRenderer(new OperationCellRenderer());
-        table.getColumnModel().getColumn(2).setCellEditor(new OperationCellEditor());
+        JCheckBox checkPrototype = new JCheckBox();
+        checkPrototype.setHorizontalAlignment(SwingConstants.CENTER);
+        table.getColumnModel().getColumn(0).setCellEditor(new DefaultCellEditor(checkPrototype));
+        table.getColumnModel().getColumn(3).setCellRenderer(new OperationCellRenderer());
+        table.getColumnModel().getColumn(3).setCellEditor(new OperationCellEditor());
 
         searchButton.addActionListener(e -> refreshTable());
         resetButton.addActionListener(e -> {
@@ -96,15 +125,18 @@ public final class CommandManagementPanel extends JPanel {
             refreshTable();
         });
         addButton.addActionListener(e -> openEditDialog(null));
+        batchDeleteButton.addActionListener(e -> batchDeleteSelectedCommands());
         refreshTable();
     }
 
     private void configureTableAppearance() {
         table.setRowHeight(44);
         table.setAutoResizeMode(JTable.AUTO_RESIZE_ALL_COLUMNS);
-        table.getColumnModel().getColumn(0).setPreferredWidth(220);
-        table.getColumnModel().getColumn(1).setPreferredWidth(520);
-        table.getColumnModel().getColumn(2).setPreferredWidth(220);
+        table.getColumnModel().getColumn(0).setPreferredWidth(JBUI.scale(44));
+        table.getColumnModel().getColumn(0).setMaxWidth(JBUI.scale(56));
+        table.getColumnModel().getColumn(1).setPreferredWidth(220);
+        table.getColumnModel().getColumn(2).setPreferredWidth(520);
+        table.getColumnModel().getColumn(3).setPreferredWidth(220);
         table.getTableHeader().setReorderingAllowed(false);
         table.setIntercellSpacing(new java.awt.Dimension(8, 4));
         table.setShowGrid(false);
@@ -112,12 +144,12 @@ public final class CommandManagementPanel extends JPanel {
         javax.swing.table.DefaultTableCellRenderer leftCellRenderer = new javax.swing.table.DefaultTableCellRenderer();
         leftCellRenderer.setHorizontalAlignment(SwingConstants.LEFT);
         leftCellRenderer.setBorder(javax.swing.BorderFactory.createEmptyBorder(0, 6, 0, 0));
-        for (int i = 0; i < 2; i++) {
+        for (int i = 1; i < 3; i++) {
             table.getColumnModel().getColumn(i).setCellRenderer(leftCellRenderer);
         }
 
         TableCellRenderer headerRenderer = table.getTableHeader().getDefaultRenderer();
-        for (int i = 0; i < table.getColumnModel().getColumnCount(); i++) {
+        for (int i = 1; i < table.getColumnModel().getColumnCount(); i++) {
             table.getColumnModel().getColumn(i).setHeaderRenderer((tbl, value, selected, focus, row, column) -> {
                 Component component = headerRenderer.getTableCellRendererComponent(tbl, value, selected, focus, row, column);
                 if (component instanceof JLabel label) {
@@ -127,21 +159,59 @@ public final class CommandManagementPanel extends JPanel {
                 return component;
             });
         }
+        MasterCheckboxColumnHeaderSupport.install(
+                table,
+                0,
+                headerRenderer,
+                MyMessageBundle.message("command.manager.header.masterSelect.tooltip"));
     }
 
     private void refreshTable() {
         String keyword = nameSearchField.getText().trim().toLowerCase();
+        visibleCommandIds.clear();
         tableModel.setRowCount(0);
         for (CommandTemplate command : stateService.getCommands()) {
             if (!contains(command.getName(), keyword)) {
                 continue;
             }
+            visibleCommandIds.add(command.getId());
             tableModel.addRow(new Object[]{
+                    Boolean.FALSE,
                     command.getName(),
                     command.getContent(),
                     MyMessageBundle.message("command.manager.col.operation")
             });
         }
+    }
+
+    private void batchDeleteSelectedCommands() {
+        List<String> ids = new ArrayList<>();
+        for (int r = 0; r < tableModel.getRowCount(); r++) {
+            if (Boolean.TRUE.equals(tableModel.getValueAt(r, 0))) {
+                ids.add(visibleCommandIds.get(r));
+            }
+        }
+        if (ids.isEmpty()) {
+            JOptionPane.showMessageDialog(
+                    this,
+                    MyMessageBundle.message("command.manager.batchDelete.none"),
+                    MyMessageBundle.message("command.manager.batchDelete"),
+                    JOptionPane.INFORMATION_MESSAGE);
+            return;
+        }
+        int confirm = JOptionPane.showConfirmDialog(
+                this,
+                MyMessageBundle.message("command.manager.confirm.batchDelete", ids.size()),
+                MyMessageBundle.message("command.manager.batchDelete"),
+                JOptionPane.OK_CANCEL_OPTION,
+                JOptionPane.WARNING_MESSAGE);
+        if (confirm != JOptionPane.OK_OPTION) {
+            return;
+        }
+        for (String id : ids) {
+            stateService.deleteCommandById(id);
+        }
+        refreshTable();
     }
 
     private static boolean contains(String source, String keyword) {
@@ -152,12 +222,12 @@ public final class CommandManagementPanel extends JPanel {
     }
 
     private CommandTemplate commandAtRow(int row) {
-        if (row < 0 || row >= tableModel.getRowCount()) {
+        if (row < 0 || row >= visibleCommandIds.size()) {
             return null;
         }
-        String name = Objects.toString(tableModel.getValueAt(row, 0), "");
+        String id = visibleCommandIds.get(row);
         for (CommandTemplate command : stateService.getCommands()) {
-            if (Objects.equals(name, command.getName())) {
+            if (Objects.equals(id, command.getId())) {
                 return command;
             }
         }
@@ -254,7 +324,7 @@ public final class CommandManagementPanel extends JPanel {
 
     private final class CommandFormDialog extends JDialog {
         private final JTextField nameField = new JTextField();
-        private final JTextArea commandArea = new JTextArea(8, 0);
+        private final JTextArea commandArea = new JTextArea(10, 56);
         private final JLabel nameError = errorLabel();
         private final JLabel commandError = errorLabel();
         private final CommandTemplate existing;
@@ -268,8 +338,10 @@ public final class CommandManagementPanel extends JPanel {
 
             commandArea.setLineWrap(true);
             commandArea.setWrapStyleWord(true);
+            commandArea.setTabSize(4);
             JBScrollPane commandScroll = new JBScrollPane(commandArea);
-            commandScroll.setPreferredSize(new java.awt.Dimension(520, 180));
+            commandScroll.setPreferredSize(new java.awt.Dimension(JBUI.scale(460), JBUI.scale(200)));
+            commandScroll.setMinimumSize(new java.awt.Dimension(JBUI.scale(360), JBUI.scale(120)));
 
             JPanel form = new JPanel(new GridBagLayout());
             GridBagConstraints gbc = new GridBagConstraints();
@@ -277,7 +349,7 @@ public final class CommandManagementPanel extends JPanel {
             gbc.fill = GridBagConstraints.HORIZONTAL;
             int row = 0;
             addField(form, gbc, row++, MyMessageBundle.message("command.manager.col.name"), nameField, nameError);
-            addField(form, gbc, row, MyMessageBundle.message("command.manager.col.command"), commandScroll, commandError);
+            addCommandField(form, gbc, row, MyMessageBundle.message("command.manager.col.command"), commandScroll, commandError);
 
             JPanel buttons = new JPanel(new FlowLayout(FlowLayout.RIGHT));
             JButton saveBtn = new JButton(MyMessageBundle.message("command.manager.save"));
@@ -294,12 +366,13 @@ public final class CommandManagementPanel extends JPanel {
             }
 
             applyIdeaFont(nameField, commandArea);
+            applyCompactSearchField(nameField);
 
             saveBtn.addActionListener(e -> saveCommand());
             cancelBtn.addActionListener(e -> dispose());
 
-            setSize(560, 420);
-            setMinimumSize(new java.awt.Dimension(520, 360));
+            setSize(JBUI.scale(520), JBUI.scale(440));
+            setMinimumSize(new java.awt.Dimension(JBUI.scale(480), JBUI.scale(380)));
             setLocationRelativeTo(SwingUtilities.getWindowAncestor(CommandManagementPanel.this));
         }
 
@@ -364,16 +437,54 @@ public final class CommandManagementPanel extends JPanel {
             gbc.gridx = 0;
             gbc.gridy = row * 2;
             gbc.weightx = 0;
+            gbc.weighty = 0;
             gbc.gridwidth = 1;
             form.add(new JLabel(title), gbc);
             gbc.gridx = 1;
             gbc.weightx = 1;
+            gbc.weighty = 0;
             gbc.fill = GridBagConstraints.HORIZONTAL;
             form.add(input, gbc);
 
             gbc.gridx = 1;
             gbc.gridy = row * 2 + 1;
             gbc.weightx = 1;
+            gbc.weighty = 0;
+            gbc.fill = GridBagConstraints.HORIZONTAL;
+            gbc.insets = new Insets(0, 4, 6, 4);
+            form.add(error, gbc);
+            gbc.insets = new Insets(4, 4, 2, 4);
+        }
+
+        /**
+         * 多行命令区：横向占满、竖向可随窗口拉伸，便于编辑长命令。
+         */
+        private void addCommandField(JPanel form,
+                                     GridBagConstraints gbc,
+                                     int row,
+                                     String title,
+                                     java.awt.Component commandEditor,
+                                     JLabel error) {
+            gbc.gridx = 0;
+            gbc.gridy = row * 2;
+            gbc.gridwidth = 1;
+            gbc.weightx = 0;
+            gbc.weighty = 0;
+            gbc.fill = GridBagConstraints.NONE;
+            gbc.anchor = GridBagConstraints.NORTHWEST;
+            form.add(new JLabel(title), gbc);
+
+            gbc.gridx = 1;
+            gbc.weightx = 1;
+            gbc.weighty = 1;
+            gbc.fill = GridBagConstraints.BOTH;
+            gbc.anchor = GridBagConstraints.CENTER;
+            form.add(commandEditor, gbc);
+
+            gbc.gridx = 1;
+            gbc.gridy = row * 2 + 1;
+            gbc.weightx = 1;
+            gbc.weighty = 0;
             gbc.fill = GridBagConstraints.HORIZONTAL;
             gbc.insets = new Insets(0, 4, 6, 4);
             form.add(error, gbc);
@@ -389,5 +500,14 @@ public final class CommandManagementPanel extends JPanel {
         for (JComponent component : components) {
             component.setFont(font);
         }
+    }
+
+    private static void applyCompactSearchField(JTextField field) {
+        int minW = JBUI.scale(100);
+        int prefW = JBUI.scale(200);
+        java.awt.Dimension h = field.getPreferredSize();
+        field.setMinimumSize(new java.awt.Dimension(minW, h.height));
+        field.setPreferredSize(new java.awt.Dimension(prefW, h.height));
+        field.setMaximumSize(new java.awt.Dimension(prefW + JBUI.scale(40), h.height));
     }
 }

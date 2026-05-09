@@ -11,6 +11,7 @@ import com.sshdeploy.deploy.remote.RemoteClient;
 import com.sshdeploy.deploy.remote.RemoteClientFactory;
 import com.sshdeploy.deploy.remote.RemoteCommandResult;
 import com.sshdeploy.deploy.remote.RemoteConnectRequest;
+import com.sshdeploy.deploy.remote.RemoteShellCommand;
 import com.sshdeploy.deploy.remote.RemoteCredentials;
 import com.sshdeploy.deploy.security.CredentialStore;
 import com.sshdeploy.deploy.storage.DeployPluginStateService;
@@ -65,6 +66,7 @@ public final class DeployOrchestrator {
             DeployProfile profile = requireProfile(deployProfileId);
             ServerProfile target = requireServer(profile.getServerRef());
             UploadConfig upload = requireUpload(profile.getUploadConfigRef());
+            String remoteWorkingDir = upload.getRemotePath();
 
             RemoteCredentials targetCreds = credentialResolver.resolve(target, credentialStore);
 
@@ -89,7 +91,8 @@ public final class DeployOrchestrator {
                 }
 
                 if (profile.isBeforeCommandsEnabled() && !options.isSkipBeforeCommands()) {
-                    runCommands(profile.getBeforeCommandRefs(), DeployStage.BEFORE_COMMANDS, remoteClient, options, logs, listener);
+                    runCommands(profile.getBeforeCommandRefs(), DeployStage.BEFORE_COMMANDS, remoteWorkingDir,
+                            remoteClient, options, logs, listener);
                 } else {
                     log(logs, listener, DeployStage.BEFORE_COMMANDS, DeployLogLevel.INFO,
                             MyMessageBundle.message("pipeline.log.beforeUploadCommandsSkipped"));
@@ -102,14 +105,15 @@ public final class DeployOrchestrator {
                 }
 
                 if (profile.isAfterCommandsEnabled() && !options.isSkipAfterCommands()) {
-                    runCommands(profile.getAfterCommandRefs(), DeployStage.AFTER_COMMANDS, remoteClient, options, logs, listener);
+                    runCommands(profile.getAfterCommandRefs(), DeployStage.AFTER_COMMANDS, remoteWorkingDir,
+                            remoteClient, options, logs, listener);
                 } else {
                     log(logs, listener, DeployStage.AFTER_COMMANDS, DeployLogLevel.INFO,
                             MyMessageBundle.message("pipeline.log.afterUploadCommandsSkipped"));
                 }
 
                 if (profile.isTerminalCommandEnabled() && !options.isSkipTerminalCommand()) {
-                    runTerminalCommand(profile, remoteClient, options, logs, listener);
+                    runTerminalCommand(profile, remoteWorkingDir, remoteClient, options, logs, listener);
                 } else {
                     log(logs, listener, DeployStage.OPEN_TERMINAL, DeployLogLevel.INFO, "Terminal command skipped.");
                 }
@@ -190,6 +194,7 @@ public final class DeployOrchestrator {
 
     private void runCommands(List<String> commandRefs,
                              DeployStage stage,
+                             String remoteWorkingDir,
                              RemoteClient remoteClient,
                              DeployExecutionOptions options,
                              List<DeployLogEvent> logs,
@@ -207,7 +212,8 @@ public final class DeployOrchestrator {
                 log(logs, listener, stage, DeployLogLevel.INFO, "Dry-run mode, command not executed: " + command.getContent());
                 continue;
             }
-            RemoteCommandResult result = remoteClient.execute(command.getContent(), command.getTimeoutSeconds());
+            String remoteCmd = RemoteShellCommand.withRemoteWorkingDirectory(remoteWorkingDir, command.getContent());
+            RemoteCommandResult result = remoteClient.execute(remoteCmd, command.getTimeoutSeconds());
 
             if (!result.getStdOut().isBlank()) {
                 log(logs, listener, stage, DeployLogLevel.INFO, result.getStdOut());
@@ -223,6 +229,7 @@ public final class DeployOrchestrator {
     }
 
     private void runTerminalCommand(DeployProfile profile,
+                                    String remoteWorkingDir,
                                     RemoteClient remoteClient,
                                     DeployExecutionOptions options,
                                     List<DeployLogEvent> logs,
@@ -238,7 +245,8 @@ public final class DeployOrchestrator {
             return;
         }
 
-        RemoteCommandResult result = remoteClient.execute(profile.getTerminalCommand(), 60);
+        String remoteCmd = RemoteShellCommand.withRemoteWorkingDirectory(remoteWorkingDir, profile.getTerminalCommand());
+        RemoteCommandResult result = remoteClient.execute(remoteCmd, 60);
         if (!result.getStdOut().isBlank()) {
             log(logs, listener, DeployStage.OPEN_TERMINAL, DeployLogLevel.INFO, result.getStdOut());
         }

@@ -74,7 +74,7 @@ public final class ServerManagerDialog {
 
         dialog.add(new JScrollPane(table), BorderLayout.CENTER);
         dialog.add(buttons, BorderLayout.SOUTH);
-        dialog.setSize(700, 380);
+        dialog.setSize(350, 380);
         dialog.setLocationRelativeTo(null);
         dialog.setVisible(true);
     }

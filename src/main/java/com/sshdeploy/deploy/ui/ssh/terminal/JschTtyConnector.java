@@ -5,6 +5,7 @@ import com.sshdeploy.deploy.domain.ServerProfile;
 import com.sshdeploy.deploy.remote.RemoteCredentials;
 import com.jcraft.jsch.ChannelShell;
 import com.jcraft.jsch.ChannelSftp;
+import com.sshdeploy.deploy.remote.JschSftpChannels;
 import com.jcraft.jsch.JSch;
 import com.jcraft.jsch.SftpException;
 import com.jcraft.jsch.SftpProgressMonitor;
@@ -308,6 +309,7 @@ public final class JschTtyConnector implements TtyConnector {
 
         ChannelSftp sftp = (ChannelSftp) targetSession.openChannel("sftp");
         sftp.connect(CONNECT_TIMEOUT_MILLIS);
+        JschSftpChannels.applyFastUploadDefaults(sftp);
         try {
             ensureRemoteDirectory(sftp, remoteDir);
             String remoteFile = remoteDir.endsWith("/") ? remoteDir + localFile.getName() : remoteDir + "/" + localFile.getName();

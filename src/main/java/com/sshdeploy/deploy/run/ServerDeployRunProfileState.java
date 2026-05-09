@@ -8,6 +8,7 @@ import com.sshdeploy.deploy.remote.RemoteClient;
 import com.sshdeploy.deploy.remote.RemoteCommandResult;
 import com.sshdeploy.deploy.remote.RemoteConnectRequest;
 import com.sshdeploy.deploy.remote.RemoteCredentials;
+import com.sshdeploy.deploy.remote.RemoteShellCommand;
 import com.sshdeploy.deploy.security.PasswordSafeCredentialStore;
 import com.sshdeploy.deploy.storage.DeployPluginStateService;
 import com.sshdeploy.deploy.ui.console.DeployConsoleService;
@@ -270,17 +271,18 @@ public final class ServerDeployRunProfileState implements RunProfileState {
                 throw new CancellationException(MyMessageBundle.message("runconfig.error.userCancelled"));
             }
             String resolved = replaceCommandPlaceholders(cmd, artifactName);
+            String toRun = RemoteShellCommand.withRemoteWorkingDirectory(configuration.getRemoteUploadDir(), resolved);
             log(processHandler, consoleService,
-                    MyMessageBundle.message("runconfig.log.executingRemoteCommand", stageName, resolved));
+                    MyMessageBundle.message("runconfig.log.executingRemoteCommand", stageName, toRun));
             RemoteCommandResult result = remoteClient.executeStreaming(
-                    resolved,
+                    toRun,
                     300,
                     chunk -> logStreamChunk(processHandler, consoleService, chunk),
                     chunk -> logStreamChunk(processHandler, consoleService, chunk)
             );
             if (result.getExitCode() != 0) {
                 throw new IllegalStateException(
-                        MyMessageBundle.message("runconfig.error.commandRemoteFailed", result.getExitCode(), resolved));
+                        MyMessageBundle.message("runconfig.error.commandRemoteFailed", result.getExitCode(), toRun));
             }
         }
     }

@@ -22,16 +22,34 @@ import java.util.List;
 import java.util.Properties;
 import java.util.function.Consumer;
 
+import com.intellij.openapi.diagnostic.Logger;
+
 public final class JschRemoteClient implements RemoteClient {
+    private static final Logger LOG = Logger.getInstance(JschRemoteClient.class);
     private static final int CONNECT_TIMEOUT_MILLIS = 15_000;
     private static final int POLL_INTERVAL_MILLIS = 100;
 
     private Session targetSession;
+    private RemoteConnectRequest lastConnectRequest;
 
     @Override
     public void connect(RemoteConnectRequest request) throws Exception {
         close();
+        lastConnectRequest = request;
         targetSession = createSession(request.getTarget(), request.getTargetCredentials());
+        targetSession.connect(CONNECT_TIMEOUT_MILLIS);
+    }
+
+    /**
+     * Drops the TCP session and reconnects using the last {@link #connect} request.
+     * Used after transient JSch channel failures.
+     */
+    private void reconnectSameHost() throws Exception {
+        if (lastConnectRequest == null) {
+            throw new IllegalStateException("SSH reconnect requested without prior connect().");
+        }
+        close();
+        targetSession = createSession(lastConnectRequest.getTarget(), lastConnectRequest.getTargetCredentials());
         targetSession.connect(CONNECT_TIMEOUT_MILLIS);
     }
 
@@ -47,6 +65,27 @@ public final class JschRemoteClient implements RemoteClient {
 
     @Override
     public void uploadFile(File localFile, String remotePath, UploadProgressListener listener) throws Exception {
+        Exception last = null;
+        for (int attempt = 1; attempt <= JschRetry.MAX_ATTEMPTS; attempt++) {
+            try {
+                uploadFileOnce(localFile, remotePath, listener);
+                return;
+            } catch (Exception e) {
+                last = e;
+                if (attempt >= JschRetry.MAX_ATTEMPTS || !JschRetry.isTransient(e)) {
+                    throw e;
+                }
+                LOG.warn("SFTP upload attempt " + attempt + "/" + JschRetry.MAX_ATTEMPTS + " failed, will retry: " + e.getMessage());
+                Thread.sleep(JschRetry.DELAY_MS);
+                reconnectSameHost();
+            }
+        }
+        if (last != null) {
+            throw last;
+        }
+    }
+
+    private void uploadFileOnce(File localFile, String remotePath, UploadProgressListener listener) throws Exception {
         ChannelSftp sftp = openSftpChannel();
         try {
             ensureRemoteDirectory(sftp, parentPath(remotePath));
@@ -84,6 +123,27 @@ public final class JschRemoteClient implements RemoteClient {
 
     @Override
     public void uploadDirectory(File localDirectory, String remoteDirectory, List<String> filters) throws Exception {
+        Exception last = null;
+        for (int attempt = 1; attempt <= JschRetry.MAX_ATTEMPTS; attempt++) {
+            try {
+                uploadDirectoryOnce(localDirectory, remoteDirectory, filters);
+                return;
+            } catch (Exception e) {
+                last = e;
+                if (attempt >= JschRetry.MAX_ATTEMPTS || !JschRetry.isTransient(e)) {
+                    throw e;
+                }
+                LOG.warn("SFTP directory upload attempt " + attempt + "/" + JschRetry.MAX_ATTEMPTS + " failed, will retry: " + e.getMessage());
+                Thread.sleep(JschRetry.DELAY_MS);
+                reconnectSameHost();
+            }
+        }
+        if (last != null) {
+            throw last;
+        }
+    }
+
+    private void uploadDirectoryOnce(File localDirectory, String remoteDirectory, List<String> filters) throws Exception {
         ChannelSftp sftp = openSftpChannel();
         try {
             ensureRemoteDirectory(sftp, remoteDirectory);
@@ -104,6 +164,30 @@ public final class JschRemoteClient implements RemoteClient {
                                                 int timeoutSeconds,
                                                 Consumer<String> stdOutConsumer,
                                                 Consumer<String> stdErrConsumer) throws Exception {
+        Exception last = null;
+        for (int attempt = 1; attempt <= JschRetry.MAX_ATTEMPTS; attempt++) {
+            try {
+                return executeStreamingOnce(command, timeoutSeconds, stdOutConsumer, stdErrConsumer);
+            } catch (Exception e) {
+                last = e;
+                if (attempt >= JschRetry.MAX_ATTEMPTS || !JschRetry.isTransient(e)) {
+                    throw e;
+                }
+                LOG.warn("Remote exec attempt " + attempt + "/" + JschRetry.MAX_ATTEMPTS + " failed, will retry: " + e.getMessage());
+                Thread.sleep(JschRetry.DELAY_MS);
+                reconnectSameHost();
+            }
+        }
+        if (last != null) {
+            throw last;
+        }
+        throw new IllegalStateException("executeStreaming: no result");
+    }
+
+    private RemoteCommandResult executeStreamingOnce(String command,
+                                                       int timeoutSeconds,
+                                                       Consumer<String> stdOutConsumer,
+                                                       Consumer<String> stdErrConsumer) throws Exception {
         ChannelExec channel = (ChannelExec) targetSession.openChannel("exec");
         channel.setCommand(command);
         channel.setInputStream(null);
@@ -190,9 +274,24 @@ public final class JschRemoteClient implements RemoteClient {
     }
 
     private ChannelSftp openSftpChannel() throws Exception {
-        Channel channel = targetSession.openChannel("sftp");
-        channel.connect(CONNECT_TIMEOUT_MILLIS);
-        return (ChannelSftp) channel;
+        Exception last = null;
+        for (int attempt = 1; attempt <= JschRetry.MAX_ATTEMPTS; attempt++) {
+            try {
+                Channel channel = targetSession.openChannel("sftp");
+                channel.connect(CONNECT_TIMEOUT_MILLIS);
+                ChannelSftp sftp = (ChannelSftp) channel;
+                JschSftpChannels.applyFastUploadDefaults(sftp);
+                return sftp;
+            } catch (Exception e) {
+                last = e;
+                if (attempt >= JschRetry.MAX_ATTEMPTS || !JschRetry.isTransient(e)) {
+                    throw e;
+                }
+                LOG.warn("SFTP channel open attempt " + attempt + "/" + JschRetry.MAX_ATTEMPTS + " failed, will retry: " + e.getMessage());
+                Thread.sleep(JschRetry.DELAY_MS);
+            }
+        }
+        throw last != null ? last : new IllegalStateException("openSftpChannel failed");
     }
 
     private void uploadDirectoryRecursive(ChannelSftp sftp,

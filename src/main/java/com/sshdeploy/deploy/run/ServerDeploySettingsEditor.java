@@ -118,6 +118,11 @@ public final class ServerDeploySettingsEditor extends SettingsEditor<ServerDeplo
         terminalCommandUseBtn = new JButton(MyMessageBundle.message("runconfig.command.add"));
         terminalCommandField = new JTextField();
 
+        applyCompactRunConfigFieldWidths(
+                serverCombo, uploadModeCombo, uploadFileField, uploadDirectoryField,
+                regexBuiltinCombo, regexField, preCommandCombo, postCommandCombo,
+                terminalCommandCombo, remoteDirField, terminalCommandField);
+
         applyIdeaFont(uploadFileField, uploadDirectoryField, regexField, preCommandsArea, remoteDirField, postCommandsArea, terminalCommandField);
         applyInputPadding();
 
@@ -381,13 +386,56 @@ public final class ServerDeploySettingsEditor extends SettingsEditor<ServerDeplo
     }
 
     private static void addRow(JPanel panel, GridBagConstraints gbc, int row, String label, JComponent component) {
+        gbc.gridwidth = 1;
         gbc.gridx = 0;
         gbc.gridy = row;
         gbc.weightx = 0;
-        panel.add(new JLabel(label), gbc);
+        gbc.weighty = 0;
+        gbc.fill = GridBagConstraints.NONE;
+        gbc.anchor = GridBagConstraints.WEST;
+        panel.add(label.isEmpty() ? new JLabel() : new JLabel(label), gbc);
         gbc.gridx = 1;
         gbc.weightx = 1;
+        gbc.fill = GridBagConstraints.HORIZONTAL;
         panel.add(component, gbc);
+    }
+
+    /**
+     * Only constrains minimum widths so fields stay usable in small dialogs; horizontal growth
+     * comes from {@link #addRow} GridBag {@code weightx}.
+     */
+    private static void applyCompactRunConfigFieldWidths(JComboBox<ServerItem> serverCombo,
+                                                         JComboBox<ModeItem> uploadModeCombo,
+                                                         JTextField uploadFileField,
+                                                         JTextField uploadDirectoryField,
+                                                         JComboBox<BuiltinRegexItem> regexBuiltinCombo,
+                                                         JTextField regexField,
+                                                         JComboBox<CommandItem> preCommandCombo,
+                                                         JComboBox<CommandItem> postCommandCombo,
+                                                         JComboBox<CommandItem> terminalCommandCombo,
+                                                         JTextField remoteDirField,
+                                                         JTextField terminalCommandField) {
+        int minW = JBUI.scale(160);
+        applyGrowableCombo(serverCombo, minW);
+        applyGrowableCombo(uploadModeCombo, minW);
+        applyGrowableCombo(regexBuiltinCombo, minW);
+        applyGrowableCombo(preCommandCombo, minW);
+        applyGrowableCombo(postCommandCombo, minW);
+        applyGrowableCombo(terminalCommandCombo, minW);
+        for (JTextField field : new JTextField[]{
+                uploadFileField, uploadDirectoryField, regexField, remoteDirField, terminalCommandField}) {
+            java.awt.Dimension h = field.getPreferredSize();
+            field.setMinimumSize(new java.awt.Dimension(minW, h.height));
+            field.setPreferredSize(null);
+            field.setMaximumSize(new java.awt.Dimension(Integer.MAX_VALUE, h.height));
+        }
+    }
+
+    private static <T> void applyGrowableCombo(JComboBox<T> combo, int minW) {
+        java.awt.Dimension h = combo.getPreferredSize();
+        combo.setMinimumSize(new java.awt.Dimension(minW, h.height));
+        combo.setPreferredSize(null);
+        combo.setMaximumSize(new java.awt.Dimension(Integer.MAX_VALUE, h.height));
     }
 
     private void markError(JComponent comp) {
@@ -532,7 +580,11 @@ public final class ServerDeploySettingsEditor extends SettingsEditor<ServerDeplo
         field.setOneLineMode(false);
         int lineHeight = 22;
         int height = Math.max(88, rows * lineHeight + 12);
-        field.setPreferredSize(new java.awt.Dimension(10, height));
+        java.awt.Dimension pref = field.getPreferredSize();
+        int minWidth = JBUI.scale(200);
+        field.setMinimumSize(new java.awt.Dimension(minWidth, height));
+        field.setPreferredSize(new java.awt.Dimension(Math.max(minWidth, pref.width), height));
+        field.setMaximumSize(new java.awt.Dimension(Integer.MAX_VALUE, height));
         return field;
     }
 
@@ -550,7 +602,7 @@ public final class ServerDeploySettingsEditor extends SettingsEditor<ServerDeplo
         JList<PlaceholderItem> list = new JList<>(items);
         list.setSelectedIndex(0);
         JBScrollPane scrollPane = new JBScrollPane(list);
-        scrollPane.setPreferredSize(new java.awt.Dimension(420, 180));
+        scrollPane.setPreferredSize(new java.awt.Dimension(JBUI.scale(210), JBUI.scale(90)));
         int result = JOptionPane.showConfirmDialog(
                 panel,
                 scrollPane,

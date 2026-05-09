@@ -33,4 +33,9 @@ public final class DeployConsoleService {
     public List<String> snapshot() {
         return List.copyOf(logs);
     }
+
+    /** Clears the in-memory log buffer (tool window display should be cleared by the caller). */
+    public void clear() {
+        logs.clear();
+    }
 }

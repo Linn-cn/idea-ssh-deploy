@@ -2,6 +2,7 @@ package com.sshdeploy.deploy.ui.ssh.terminal;
 
 import com.sshdeploy.deploy.domain.ServerProfile;
 import com.sshdeploy.deploy.remote.RemoteCredentials;
+import com.sshdeploy.deploy.remote.JschRetry;
 import com.intellij.openapi.project.Project;
 import com.intellij.remoteServer.agent.util.log.TerminalListener;
 import org.jetbrains.plugins.terminal.TerminalTabState;
@@ -25,15 +26,30 @@ public final class SshTerminalOpener {
                                  ServerProfile target,
                                  RemoteCredentials targetCredentials) {
         String title = target.getName() + " (" + target.getHost() + ":" + target.getPort() + ")";
-        JschTtyConnector connector = new JschTtyConnector(target, targetCredentials, null);
-        connector.setName(title);
-        // 主动初始化，避免依赖 Terminal 内部回调时序导致的初始化超时
-        boolean ok = connector.init(null);
-        if (!ok) {
+        JschTtyConnector connector = null;
+        boolean ok = false;
+        for (int attempt = 1; attempt <= JschRetry.MAX_ATTEMPTS; attempt++) {
+            connector = new JschTtyConnector(target, targetCredentials, null);
+            connector.setName(title);
+            ok = connector.init(null);
+            if (ok) {
+                break;
+            }
+            if (attempt < JschRetry.MAX_ATTEMPTS) {
+                try {
+                    Thread.sleep(JschRetry.DELAY_MS);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    throw new IllegalStateException("Interrupted while retrying SSH terminal open", e);
+                }
+            }
+        }
+        if (!ok || connector == null) {
             throw new IllegalStateException("SSH terminal connector init failed.");
         }
-        ClosableCloudTerminalProcess process = new ClosableCloudTerminalProcess(connector);
-        TerminalListener.TtyResizeHandler resizeHandler = (w, h) -> connector.resize(new Dimension(w, h), new Dimension(0, 0));
+        final JschTtyConnector connected = connector;
+        ClosableCloudTerminalProcess process = new ClosableCloudTerminalProcess(connected);
+        TerminalListener.TtyResizeHandler resizeHandler = (w, h) -> connected.resize(new Dimension(w, h), new Dimension(0, 0));
         CloudTerminalRunner runner = createRunner(project, title, process, resizeHandler);
         if (runner == null) {
             throw new IllegalStateException("Cannot create cloud terminal runner");
@@ -41,7 +57,7 @@ public final class SshTerminalOpener {
         TerminalTabState state = new TerminalTabState();
         state.myTabName = title;
         TerminalView.getInstance(project).createNewSession(runner, state);
-        return connector;
+        return connected;
     }
 
     private static CloudTerminalRunner createRunner(Project project,

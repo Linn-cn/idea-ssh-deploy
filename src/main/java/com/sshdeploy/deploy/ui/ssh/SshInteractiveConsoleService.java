@@ -2,7 +2,9 @@ package com.sshdeploy.deploy.ui.ssh;
 
 import com.sshdeploy.deploy.domain.AuthType;
 import com.sshdeploy.deploy.domain.ServerProfile;
+import com.sshdeploy.deploy.remote.JschSftpChannels;
 import com.sshdeploy.deploy.remote.RemoteCredentials;
+import com.sshdeploy.deploy.remote.RemoteShellCommand;
 import com.intellij.openapi.components.Service;
 import com.intellij.openapi.Disposable;
 import com.jcraft.jsch.ChannelExec;
@@ -69,7 +71,7 @@ public final class SshInteractiveConsoleService implements Disposable {
         if (preCommands != null) {
             for (String cmd : preCommands) {
                 if (cmd == null || cmd.isBlank()) continue;
-                execAndFailOnError(cmd, null);
+                execAndFailOnError(RemoteShellCommand.withRemoteWorkingDirectory(remoteDir, cmd), null);
             }
         }
 
@@ -80,7 +82,7 @@ public final class SshInteractiveConsoleService implements Disposable {
         if (postCommands != null) {
             for (String cmd : postCommands) {
                 if (cmd == null || cmd.isBlank()) continue;
-                execAndFailOnError(cmd, null);
+                execAndFailOnError(RemoteShellCommand.withRemoteWorkingDirectory(remoteDir, cmd), null);
             }
         }
     }
@@ -161,6 +163,7 @@ public final class SshInteractiveConsoleService implements Disposable {
         }
         ChannelSftp sftp = (ChannelSftp) session.openChannel("sftp");
         sftp.connect(CONNECT_TIMEOUT_MILLIS);
+        JschSftpChannels.applyFastUploadDefaults(sftp);
         try {
             ensureRemoteDirectory(sftp, remoteDir);
 

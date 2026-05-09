@@ -19,6 +19,7 @@ import com.intellij.ui.components.JBLabel;
 import com.intellij.ui.components.JBPanel;
 import com.intellij.util.ui.JBUI;
 
+import javax.swing.Box;
 import javax.swing.JButton;
 import javax.swing.JCheckBox;
 import javax.swing.JComboBox;
@@ -92,13 +93,23 @@ public final class DeployControlPanel extends JBPanel<DeployControlPanel> {
         topPanel.add(new JBLabel(MyMessageBundle.message("ui.label.profile")), gbc);
 
         gbc.gridx = 1;
-        gbc.weightx = 1;
+        gbc.weightx = 0;
         topPanel.add(profileComboBox, gbc);
+        java.awt.Dimension pcPref = profileComboBox.getPreferredSize();
+        int prefW = JBUI.scale(200);
+        int minW = JBUI.scale(100);
+        profileComboBox.setMinimumSize(new java.awt.Dimension(minW, pcPref.height));
+        profileComboBox.setPreferredSize(new java.awt.Dimension(prefW, pcPref.height));
+        profileComboBox.setMaximumSize(new java.awt.Dimension(prefW + JBUI.scale(40), pcPref.height));
+        gbc.gridx = 2;
+        gbc.weightx = 1;
+        gbc.fill = GridBagConstraints.HORIZONTAL;
+        topPanel.add(Box.createHorizontalGlue(), gbc);
 
         gbc.gridx = 0;
         gbc.gridy = 1;
-        gbc.gridwidth = 2;
-        gbc.weightx = 0;
+        gbc.gridwidth = 3;
+        gbc.weightx = 1;
         JPanel optionsPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 4, 0));
         optionsPanel.add(chkDryRun);
         optionsPanel.add(chkTestConnection);
@@ -109,7 +120,8 @@ public final class DeployControlPanel extends JBPanel<DeployControlPanel> {
 
         gbc.gridx = 0;
         gbc.gridy = 2;
-        gbc.gridwidth = 2;
+        gbc.gridwidth = 3;
+        gbc.weightx = 1;
         JPanel buttonsPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 4, 0));
         buttonsPanel.add(btnDeploy);
         buttonsPanel.add(btnTestConnection);

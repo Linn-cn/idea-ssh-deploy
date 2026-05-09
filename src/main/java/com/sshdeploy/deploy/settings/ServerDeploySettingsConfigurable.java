@@ -5,9 +5,11 @@ import com.sshdeploy.deploy.importer.ActImportDialog;
 import com.intellij.openapi.options.Configurable;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.project.ProjectManager;
+import com.intellij.util.ui.JBUI;
 import org.jetbrains.annotations.Nls;
 import org.jetbrains.annotations.Nullable;
 
+import javax.swing.Box;
 import javax.swing.JButton;
 import javax.swing.JComboBox;
 import javax.swing.JComponent;
@@ -43,11 +45,14 @@ public final class ServerDeploySettingsConfigurable implements Configurable {
 
         gbc.gridx = 0;
         gbc.gridy = 0;
+        gbc.gridwidth = 1;
         gbc.weightx = 0;
+        gbc.fill = GridBagConstraints.NONE;
+        gbc.anchor = GridBagConstraints.WEST;
         panel.add(new JLabel(MyMessageBundle.message("settings.language.label")), gbc);
 
         gbc.gridx = 1;
-        gbc.weightx = 1;
+        gbc.weightx = 0;
         languageModeCombo = new JComboBox<>(PluginSettingsService.LanguageMode.values());
         languageModeCombo.setRenderer(new DefaultListCellRenderer() {
             @Override
@@ -60,32 +65,54 @@ public final class ServerDeploySettingsConfigurable implements Configurable {
                 return label;
             }
         });
+        applyCompactControlWidth(languageModeCombo);
         panel.add(languageModeCombo, gbc);
+        gbc.gridx = 2;
+        gbc.weightx = 1;
+        gbc.fill = GridBagConstraints.HORIZONTAL;
+        panel.add(Box.createHorizontalGlue(), gbc);
 
         gbc.gridx = 0;
         gbc.gridy = 1;
+        gbc.gridwidth = 1;
         gbc.weightx = 0;
+        gbc.fill = GridBagConstraints.NONE;
+        gbc.anchor = GridBagConstraints.WEST;
         panel.add(new JLabel(MyMessageBundle.message("settings.timeout.label")), gbc);
 
         gbc.gridx = 1;
-        gbc.weightx = 1;
+        gbc.weightx = 0;
         timeoutSpinner = new JSpinner(new SpinnerNumberModel(60, 1, 3600, 1));
+        applyCompactControlWidth(timeoutSpinner);
         panel.add(timeoutSpinner, gbc);
+        gbc.gridx = 2;
+        gbc.weightx = 1;
+        gbc.fill = GridBagConstraints.HORIZONTAL;
+        panel.add(Box.createHorizontalGlue(), gbc);
 
         gbc.gridx = 0;
         gbc.gridy = 2;
+        gbc.gridwidth = 1;
         gbc.weightx = 0;
+        gbc.fill = GridBagConstraints.NONE;
+        gbc.anchor = GridBagConstraints.WEST;
         panel.add(new JLabel(MyMessageBundle.message("settings.encoding.label")), gbc);
 
         gbc.gridx = 1;
-        gbc.weightx = 1;
+        gbc.weightx = 0;
         encodingField = new JTextField("UTF-8");
+        applyCompactControlWidth(encodingField);
         panel.add(encodingField, gbc);
+        gbc.gridx = 2;
+        gbc.weightx = 1;
+        gbc.fill = GridBagConstraints.HORIZONTAL;
+        panel.add(Box.createHorizontalGlue(), gbc);
 
         gbc.gridx = 0;
         gbc.gridy = 3;
-        gbc.gridwidth = 2;
+        gbc.gridwidth = 3;
         gbc.weightx = 1;
+        gbc.fill = GridBagConstraints.HORIZONTAL;
         JPanel importPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 0));
         importPanel.add(new JLabel(MyMessageBundle.message("settings.importAct.hint")));
         JButton importActBtn = new JButton(MyMessageBundle.message("settings.importAct.button"));
@@ -145,5 +172,20 @@ public final class ServerDeploySettingsConfigurable implements Configurable {
             case EN_US -> MyMessageBundle.message("settings.language.enUS");
             case FOLLOW_IDE -> MyMessageBundle.message("settings.language.followIDE");
         };
+    }
+
+    /**
+     * 设置页内控件不再横向铺满：约为原先常见拉伸宽度的一半量级。
+     */
+    private static void applyCompactControlWidth(javax.swing.JComponent component) {
+        int minW = JBUI.scale(100);
+        int prefW = JBUI.scale(200);
+        java.awt.Dimension min = new java.awt.Dimension(minW, component.getMinimumSize().height);
+        java.awt.Dimension pref = new java.awt.Dimension(prefW, component.getPreferredSize().height);
+        component.setMinimumSize(min);
+        component.setPreferredSize(pref);
+        if (!(component instanceof JSpinner)) {
+            component.setMaximumSize(new java.awt.Dimension(prefW + JBUI.scale(40), pref.height));
+        }
     }
 }
