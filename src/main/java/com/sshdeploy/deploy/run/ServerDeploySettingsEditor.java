@@ -1,7 +1,9 @@
 package com.sshdeploy.deploy.run;
 
 import com.sshdeploy.MyMessageBundle;
+import com.sshdeploy.deploy.domain.BuiltinFileMatchRules;
 import com.sshdeploy.deploy.domain.CommandTemplate;
+import com.sshdeploy.deploy.domain.FileMatchRule;
 import com.sshdeploy.deploy.domain.ServerProfile;
 import com.sshdeploy.deploy.storage.DeployPluginStateService;
 import com.intellij.icons.AllIcons;
@@ -46,9 +48,6 @@ import java.util.regex.PatternSyntaxException;
 public final class ServerDeploySettingsEditor extends SettingsEditor<ServerDeployRunConfiguration> {
     private static final String MODE_DIRECT = "DIRECT_FILE";
     private static final String MODE_REGEX = "DIR_REGEX";
-    private static final String DEFAULT_REGEX = "^(?!.*(?:-sources|\\.original)\\.jar$).+\\.jar$";
-    private static final String BUILTIN_SPRINGBOOT = "SPRING_BOOT_JAR";
-    private static final String BUILTIN_NONE = "";
     private static final javax.swing.border.Border DEFAULT_BORDER = JBUI.Borders.customLine(JBColor.border(), 1);
     private static final javax.swing.border.Border ERROR_BORDER = JBUI.Borders.customLine(JBColor.RED, 1);
     private static final javax.swing.border.Border DEFAULT_PAD_SINGLE = paddedBorder(DEFAULT_BORDER, 0, 6, 0, 6);
@@ -64,9 +63,9 @@ public final class ServerDeploySettingsEditor extends SettingsEditor<ServerDeplo
     private final JComboBox<ModeItem> uploadModeCombo;
     private final JTextField uploadFileField;
     private final JTextField uploadDirectoryField;
-    private final JComboBox<BuiltinRegexItem> regexBuiltinCombo;
+    private final JComboBox<FileRegexRuleItem> regexRuleCombo;
     private final JTextField regexField;
-    private final JButton regexBuiltinAddBtn;
+    private final JButton regexRuleApplyBtn;
     private final EditorTextField preCommandsArea;
     private final JComboBox<CommandItem> preCommandCombo;
     private final JButton preCommandAddBtn;
@@ -99,16 +98,13 @@ public final class ServerDeploySettingsEditor extends SettingsEditor<ServerDeplo
         });
         uploadFileField = new JTextField();
         uploadDirectoryField = new JTextField();
-        regexBuiltinCombo = new JComboBox<>(new BuiltinRegexItem[]{
-                new BuiltinRegexItem(BUILTIN_NONE, MyMessageBundle.message("runconfig.upload.regex.none"), ""),
-                new BuiltinRegexItem(BUILTIN_SPRINGBOOT, MyMessageBundle.message("runconfig.upload.regex.springboot"), DEFAULT_REGEX)
-        });
+        regexRuleCombo = new JComboBox<>();
         regexField = new JTextField();
 
         preCommandsArea = createCommandEditorField(4);
         preCommandCombo = new JComboBox<>();
         preCommandAddBtn = new JButton(MyMessageBundle.message("runconfig.command.add"));
-        regexBuiltinAddBtn = new JButton(MyMessageBundle.message("runconfig.command.add"));
+        regexRuleApplyBtn = new JButton(MyMessageBundle.message("runconfig.regex.apply"));
 
         remoteDirField = new JTextField();
         postCommandsArea = createCommandEditorField(5);
@@ -120,7 +116,7 @@ public final class ServerDeploySettingsEditor extends SettingsEditor<ServerDeplo
 
         applyCompactRunConfigFieldWidths(
                 serverCombo, uploadModeCombo, uploadFileField, uploadDirectoryField,
-                regexBuiltinCombo, regexField, preCommandCombo, postCommandCombo,
+                regexRuleCombo, regexField, preCommandCombo, postCommandCombo,
                 terminalCommandCombo, remoteDirField, terminalCommandField);
 
         applyIdeaFont(uploadFileField, uploadDirectoryField, regexField, preCommandsArea, remoteDirField, postCommandsArea, terminalCommandField);
@@ -133,7 +129,7 @@ public final class ServerDeploySettingsEditor extends SettingsEditor<ServerDeplo
         JButton chooseDirBtn = new JButton(MyMessageBundle.message("runconfig.choose.dir"));
         chooseDirBtn.addActionListener(e -> chooseFile(uploadDirectoryField, true));
         regexRow1 = rowWithButton(MyMessageBundle.message("runconfig.editor.uploadDir"), uploadDirectoryField, chooseDirBtn);
-        regexRow2 = rowWithButton(MyMessageBundle.message("runconfig.editor.uploadRegexBuiltin"), regexBuiltinCombo, regexBuiltinAddBtn);
+        regexRow2 = rowWithButton(MyMessageBundle.message("runconfig.editor.uploadRegexRuleSelect"), regexRuleCombo, regexRuleApplyBtn);
         regexRow4 = rowOnly(MyMessageBundle.message("runconfig.editor.uploadRegex"), regexField);
 
         JPanel preRow = commandRow(preCommandCombo, preCommandAddBtn);
@@ -161,13 +157,14 @@ public final class ServerDeploySettingsEditor extends SettingsEditor<ServerDeplo
 
         refreshServersInternal();
         refreshCommandCombos();
+        refreshFileRegexRuleCombo();
         serverCombo.setSelectedItem(null);
         uploadModeCombo.addActionListener(e -> refreshUploadModeVisibility());
         preCommandAddBtn.addActionListener(e -> appendSelectedCommand(preCommandCombo, preCommandsArea));
         postCommandAddBtn.addActionListener(e -> appendSelectedCommand(postCommandCombo, postCommandsArea));
         terminalCommandUseBtn.addActionListener(e -> setTextFromSelectedCommand(terminalCommandCombo, terminalCommandField));
-        regexBuiltinAddBtn.addActionListener(e -> {
-            BuiltinRegexItem item = (BuiltinRegexItem) regexBuiltinCombo.getSelectedItem();
+        regexRuleApplyBtn.addActionListener(e -> {
+            FileRegexRuleItem item = (FileRegexRuleItem) regexRuleCombo.getSelectedItem();
             if (item == null || item.regex == null || item.regex.isBlank()) {
                 return;
             }
@@ -180,12 +177,13 @@ public final class ServerDeploySettingsEditor extends SettingsEditor<ServerDeplo
     protected void resetEditorFrom(ServerDeployRunConfiguration configuration) {
         refreshServersInternal();
         refreshCommandCombos();
+        refreshFileRegexRuleCombo();
         selectServer(configuration.getServerId());
         selectMode(configuration.getUploadMode());
         uploadFileField.setText(configuration.getUploadFilePath());
         uploadDirectoryField.setText(configuration.getUploadDirectoryPath());
         regexField.setText(configuration.getUploadFileRegex());
-        selectBuiltinByRegex(configuration.getUploadFileRegex());
+        selectFileRegexRuleByPattern(configuration.getUploadFileRegex());
         preCommandsArea.setText(configuration.getPreDeployCommands());
         remoteDirField.setText(configuration.getRemoteUploadDir());
         postCommandsArea.setText(configuration.getPostDeployCommands());
@@ -280,6 +278,36 @@ public final class ServerDeploySettingsEditor extends SettingsEditor<ServerDeplo
         terminalCommandCombo.setSelectedIndex(0);
     }
 
+    private void refreshFileRegexRuleCombo() {
+        regexRuleCombo.removeAllItems();
+        regexRuleCombo.addItem(new FileRegexRuleItem(
+                MyMessageBundle.message("runconfig.upload.regex.none"),
+                ""));
+        regexRuleCombo.addItem(new FileRegexRuleItem(
+                MyMessageBundle.message("runconfig.upload.regex.springboot"),
+                BuiltinFileMatchRules.DEFAULT_SPRING_BOOT_PATTERN));
+        java.util.ArrayList<FileMatchRule> users = new java.util.ArrayList<>(stateService.getUserFileMatchRules());
+        users.sort(java.util.Comparator.comparing(FileMatchRule::getName, String.CASE_INSENSITIVE_ORDER));
+        for (FileMatchRule rule : users) {
+            regexRuleCombo.addItem(new FileRegexRuleItem(rule.getName(), rule.getPattern()));
+        }
+        regexRuleCombo.setSelectedIndex(0);
+    }
+
+    private void selectFileRegexRuleByPattern(String regex) {
+        regexRuleCombo.setSelectedIndex(0);
+        if (regex == null || regex.isBlank()) {
+            return;
+        }
+        for (int i = 0; i < regexRuleCombo.getItemCount(); i++) {
+            FileRegexRuleItem item = regexRuleCombo.getItemAt(i);
+            if (item != null && item.regex.equals(regex)) {
+                regexRuleCombo.setSelectedIndex(i);
+                return;
+            }
+        }
+    }
+
     private static void appendSelectedCommand(JComboBox<CommandItem> combo, EditorTextField area) {
         CommandItem item = (CommandItem) combo.getSelectedItem();
         if (item == null || item.content.isBlank()) {
@@ -346,23 +374,6 @@ public final class ServerDeploySettingsEditor extends SettingsEditor<ServerDeplo
         }
     }
 
-    private void selectBuiltinByRegex(String regex) {
-        regexBuiltinCombo.setSelectedIndex(0);
-        if (regex == null || regex.isBlank()) {
-            return;
-        }
-        boolean matched = false;
-        for (int i = 0; i < regexBuiltinCombo.getItemCount(); i++) {
-            BuiltinRegexItem item = regexBuiltinCombo.getItemAt(i);
-            if (item.regex.equals(regex)) {
-                regexBuiltinCombo.setSelectedIndex(i);
-                matched = true;
-                break;
-            }
-        }
-        // 未匹配内置规则时：保留下拉为“未选择”，最终规则从 regexField 读取。
-    }
-
     private static JPanel rowOnly(String label, JComponent field) {
         JPanel row = new JPanel(new BorderLayout(6, 0));
         row.add(new JLabel(label), BorderLayout.WEST);
@@ -408,7 +419,7 @@ public final class ServerDeploySettingsEditor extends SettingsEditor<ServerDeplo
                                                          JComboBox<ModeItem> uploadModeCombo,
                                                          JTextField uploadFileField,
                                                          JTextField uploadDirectoryField,
-                                                         JComboBox<BuiltinRegexItem> regexBuiltinCombo,
+                                                         JComboBox<FileRegexRuleItem> regexRuleCombo,
                                                          JTextField regexField,
                                                          JComboBox<CommandItem> preCommandCombo,
                                                          JComboBox<CommandItem> postCommandCombo,
@@ -418,7 +429,7 @@ public final class ServerDeploySettingsEditor extends SettingsEditor<ServerDeplo
         int minW = JBUI.scale(160);
         applyGrowableCombo(serverCombo, minW);
         applyGrowableCombo(uploadModeCombo, minW);
-        applyGrowableCombo(regexBuiltinCombo, minW);
+        applyGrowableCombo(regexRuleCombo, minW);
         applyGrowableCombo(preCommandCombo, minW);
         applyGrowableCombo(postCommandCombo, minW);
         applyGrowableCombo(terminalCommandCombo, minW);
@@ -458,7 +469,7 @@ public final class ServerDeploySettingsEditor extends SettingsEditor<ServerDeplo
         serverCombo.setBorder(UIManager.getBorder("ComboBox.border"));
         uploadFileField.setBorder(DEFAULT_PAD_SINGLE);
         uploadDirectoryField.setBorder(DEFAULT_PAD_SINGLE);
-        regexBuiltinCombo.setBorder(UIManager.getBorder("ComboBox.border"));
+        regexRuleCombo.setBorder(UIManager.getBorder("ComboBox.border"));
         regexField.setBorder(DEFAULT_PAD_SINGLE);
         remoteDirField.setBorder(DEFAULT_PAD_SINGLE);
         preCommandsArea.setBorder(UIManager.getBorder("TextField.border"));
@@ -675,15 +686,13 @@ public final class ServerDeploySettingsEditor extends SettingsEditor<ServerDeplo
         }
     }
 
-    private static final class BuiltinRegexItem {
-        private final String key;
+    private static final class FileRegexRuleItem {
         private final String label;
         private final String regex;
 
-        private BuiltinRegexItem(String key, String label, String regex) {
-            this.key = key;
+        private FileRegexRuleItem(String label, String regex) {
             this.label = label;
-            this.regex = regex;
+            this.regex = regex == null ? "" : regex;
         }
 
         @Override

@@ -12,9 +12,10 @@
     <p><b>Features</b></p>
     <ul>
         <li><b>SSH servers</b> — password or private key authentication.</li>
-        <li><b>Reusable commands</b> — save shell snippets and reuse them in deploy profiles or Run configurations.</li>
+        <li><b>Reusable commands</b> — save shell snippets and reuse them in Run configurations (and in deploy profiles when imported).</li>
+        <li><b>File match rules</b> — built-in presets (read-only) plus your own regex rules you can add, edit, or delete; reused from the Tool window manager and when picking a preset in Run configurations.</li>
         <li><b>Upload pipeline</b> — optional local build (Maven/Gradle), SFTP upload, remote commands <b>before</b> and <b>after</b> upload with streaming logs, optional <b>Terminal</b> tab for follow-up work.</li>
-        <li><b>Run/Debug configuration</b> — pick server, local artifact (file or directory + regex), remote directory, commands before/after upload, and an optional one-line terminal command sent after success.</li>
+        <li><b>Run/Debug configuration</b> — pick server, local artifact (single file or directory + file-name regex). In directory mode, choose a regex from managed rules (“Select regex”), apply it into the regex field, or type a pattern manually.</li>
         <li><b>Placeholders</b> — use <code>${fileName}</code> in remote commands for the uploaded file name (e.g. versioned JAR).</li>
         <li><b>Import</b> — import <b>Alibaba Cloud Toolkit (ACT)</b> style XML to migrate faster.</li>
         <li><b>Languages</b> — English and Simplified Chinese UI (follow IDE or override in Settings).</li>
@@ -24,15 +25,16 @@
     <ol>
         <li>Open the <b>SSH Deploy</b> tool window (right tool window bar, or <b>View → Tool Windows</b>).</li>
         <li>Under <b>Servers</b>, add SSH hosts. Credentials can use the IDE password safe.</li>
-        <li>Under <b>Commands</b>, add remote shell lines you reuse.</li>
-        <li>Under <b>Deploy</b>, create profiles linking server, upload mapping, and optional before/after commands or terminal.</li>
-        <li>Use <b>Deploy</b>, <b>Test connection</b>, or <b>Dry run</b>; follow logs in the Console tab.</li>
+        <li>Under <b>Commands</b>, add remote shell lines you reuse in Run configurations.</li>
+        <li>Under <b>File match rules</b>, optionally add named regex presets (built-in rows cannot be deleted).</li>
+        <li>Use the <b>Console</b> tab for log output from operations that stream there.</li>
     </ol>
 
     <p><b>How to use (Run configuration)</b></p>
     <ol>
         <li><b>Run → Edit Configurations → + → SSH Deploy</b>.</li>
         <li>Choose SSH server, local upload source, and remote upload directory.</li>
+        <li>In <b>Directory pattern</b> mode, pick a saved regex under <b>Select regex</b> and click <b>Apply</b> to fill the file match regex (you can edit it afterward).</li>
         <li>Edit <b>before upload</b> and <b>after upload</b> commands (one per line). Use <b>insert placeholder</b> for <code>${fileName}</code> when needed.</li>
         <li>Optionally set a single-line <b>terminal command</b>; after success the plugin opens Terminal and sends that line.</li>
         <li>Run the configuration; logs appear in the Run tool window.</li>
@@ -49,7 +51,8 @@
     <p><b>功能说明</b></p>
     <ul>
         <li><b>SSH 服务器</b> — 支持密码或私钥认证。</li>
-        <li><b>可复用命令</b> — 保存常用 Shell 片段，在部署配置或运行配置中引用。</li>
+        <li><b>可复用命令</b> — 保存常用 Shell 片段，在运行配置中引用（导入的配置中的部署画像也会引用）。</li>
+        <li><b>文件匹配规则</b> — 内置正则模板（不可删除）与用户自定义「名称 + 正则」；在运行配置的<b>目录匹配</b>模式下，<b>选择正则</b>下拉来自此处（点<b>应用</b>填入正则框）。</li>
         <li><b>上传流水线</b> — 可选本地构建（Maven/Gradle）、SFTP 上传、<b>上传前/上传后</b>远程命令（流式日志），以及可选的 <b>Terminal</b> 后续操作。</li>
         <li><b>运行/调试配置</b> — 选择服务器、本地上传源（指定文件或目录+正则）、远端目录、上传前后命令，以及可选的成功后单行终端命令。</li>
         <li><b>占位符</b> — 远程命令中可使用 <code>${fileName}</code> 表示本次上传的文件名（例如带版本号的 JAR）。</li>
@@ -61,15 +64,16 @@
     <ol>
         <li>打开 <b>SSH Deploy</b> 工具窗口（右侧工具窗口条，或通过 <b>视图 → 工具窗口</b>）。</li>
         <li>在 <b>服务器</b> 中添加 SSH 主机；凭据可写入 IDE 密码保险箱。</li>
-        <li>在 <b>命令</b> 中维护可复用的远端 Shell 命令。</li>
-        <li>在 <b>部署</b> 中创建配置：关联服务器、上传映射，以及可选的上传前后命令或终端命令。</li>
-        <li>使用 <b>部署</b>、<b>测试连接</b> 或 <b>演练模式</b>；在 <b>控制台</b> 标签查看日志。</li>
+        <li>在 <b>命令</b> 中维护可在运行配置中引用的远端 Shell 命令。</li>
+        <li>在 <b>文件匹配规则</b> 中按需维护名称与正则（内置行不可删除）。</li>
+        <li>在 <b>控制台</b> 标签查看会输出到此处的日志。</li>
     </ol>
 
     <p><b>使用方式（运行配置）</b></p>
     <ol>
         <li><b>运行 → 编辑配置 → + → SSH Deploy</b>。</li>
         <li>选择 SSH 服务器、本地上传源与远端上传目录。</li>
+        <li>在<b>目录匹配</b>模式下，于<b>选择正则</b>中选取预设后点<b>应用</b>填充文件匹配正则（仍可手动修改）。</li>
         <li>编辑 <b>上传前</b> 与 <b>上传后</b> 命令（每行一条）；需要时可使用 <b>插入占位符</b> 插入 <code>${fileName}</code>。</li>
         <li>可选填写单行 <b>终端命令</b>；上传成功后插件会打开 Terminal 并自动发送该行。</li>
         <li>运行该配置；日志显示在 <b>运行</b> 工具窗口中。</li>
@@ -79,6 +83,11 @@
     ]]></description>
 
     <change-notes><![CDATA[
+    <p><b>Unreleased</b></p>
+    <ul>
+        <li><b>File match rules</b> tool-window tab — built-in presets plus user-managed name/regex rows; Run configuration <b>Select regex</b> + <b>Apply</b> fills the directory-mode pattern.</li>
+    </ul>
+    <hr/>
     <b>1.0.0</b> — Initial release.<br>
     <ul>
         <li>Server / command / upload / deploy profile management</li>

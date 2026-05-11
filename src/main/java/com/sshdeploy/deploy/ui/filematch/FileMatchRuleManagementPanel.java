@@ -1,7 +1,8 @@
-package com.sshdeploy.deploy.ui.command;
+package com.sshdeploy.deploy.ui.filematch;
 
 import com.sshdeploy.MyMessageBundle;
-import com.sshdeploy.deploy.domain.CommandTemplate;
+import com.sshdeploy.deploy.domain.BuiltinFileMatchRules;
+import com.sshdeploy.deploy.domain.FileMatchRule;
 import com.sshdeploy.deploy.storage.DeployPluginStateService;
 import com.sshdeploy.deploy.ui.common.MasterCheckboxColumnHeaderSupport;
 import com.intellij.ui.components.JBScrollPane;
@@ -18,7 +19,6 @@ import javax.swing.JLabel;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JTable;
-import javax.swing.JTextArea;
 import javax.swing.JTextField;
 import javax.swing.SwingConstants;
 import javax.swing.SwingUtilities;
@@ -29,8 +29,8 @@ import javax.swing.table.TableCellRenderer;
 import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Component;
-import java.awt.Font;
 import java.awt.FlowLayout;
+import java.awt.Font;
 import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
 import java.awt.Insets;
@@ -39,22 +39,24 @@ import java.awt.datatransfer.StringSelection;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.regex.Pattern;
+import java.util.regex.PatternSyntaxException;
 
-public final class CommandManagementPanel extends JPanel {
+public final class FileMatchRuleManagementPanel extends JPanel {
     private final DeployPluginStateService stateService;
     private final DefaultTableModel tableModel;
     private final JTable table;
     private final JTextField nameSearchField;
-    private final List<String> visibleCommandIds = new ArrayList<>();
+    private final List<String> visibleRuleIds = new ArrayList<>();
 
-    public CommandManagementPanel(DeployPluginStateService stateService) {
+    public FileMatchRuleManagementPanel(DeployPluginStateService stateService) {
         super(new BorderLayout());
         this.stateService = stateService;
         this.tableModel = new DefaultTableModel(new Object[]{
-                MyMessageBundle.message("command.manager.col.select"),
-                MyMessageBundle.message("command.manager.col.name"),
-                MyMessageBundle.message("command.manager.col.command"),
-                MyMessageBundle.message("command.manager.col.operation")
+                MyMessageBundle.message("fileMatch.manager.col.select"),
+                MyMessageBundle.message("fileMatch.manager.col.name"),
+                MyMessageBundle.message("fileMatch.manager.col.regex"),
+                MyMessageBundle.message("fileMatch.manager.col.operation")
         }, 0) {
             @Override
             public Class<?> getColumnClass(int columnIndex) {
@@ -67,7 +69,12 @@ public final class CommandManagementPanel extends JPanel {
         this.table = new JTable(tableModel) {
             @Override
             public boolean isCellEditable(int row, int column) {
-                return column == 0 || column == 3;
+                if (column == 0) {
+                    return row >= 0
+                            && row < visibleRuleIds.size()
+                            && !BuiltinFileMatchRules.isBuiltinId(visibleRuleIds.get(row));
+                }
+                return column == 3;
             }
         };
         table.setRowSelectionAllowed(true);
@@ -84,7 +91,7 @@ public final class CommandManagementPanel extends JPanel {
         gbc.weightx = 0;
         gbc.gridx = 0;
         gbc.gridy = 0;
-        topPanel.add(new JLabel(MyMessageBundle.message("command.manager.search.name")), gbc);
+        topPanel.add(new JLabel(MyMessageBundle.message("fileMatch.manager.search.name")), gbc);
         gbc.gridx = 1;
         gbc.weightx = 0;
         topPanel.add(nameSearchField, gbc);
@@ -96,16 +103,16 @@ public final class CommandManagementPanel extends JPanel {
         gbc.fill = GridBagConstraints.HORIZONTAL;
         gbc.gridx = 3;
         gbc.weightx = 0;
-        JButton searchButton = new JButton(MyMessageBundle.message("command.manager.searchBtn"));
-        JButton resetButton = new JButton(MyMessageBundle.message("command.manager.search.reset"));
-        JButton addButton = new JButton(MyMessageBundle.message("command.manager.add"));
+        JButton searchButton = new JButton(MyMessageBundle.message("fileMatch.manager.searchBtn"));
+        JButton resetButton = new JButton(MyMessageBundle.message("fileMatch.manager.search.reset"));
+        JButton addButton = new JButton(MyMessageBundle.message("fileMatch.manager.add"));
         topPanel.add(searchButton, gbc);
         gbc.gridx = 4;
         topPanel.add(resetButton, gbc);
         gbc.gridx = 5;
         topPanel.add(addButton, gbc);
         gbc.gridx = 6;
-        JButton batchDeleteButton = new JButton(MyMessageBundle.message("command.manager.batchDelete"));
+        JButton batchDeleteButton = new JButton(MyMessageBundle.message("fileMatch.manager.batchDelete"));
         topPanel.add(batchDeleteButton, gbc);
         add(topPanel, BorderLayout.NORTH);
 
@@ -116,6 +123,7 @@ public final class CommandManagementPanel extends JPanel {
         JCheckBox checkPrototype = new JCheckBox();
         checkPrototype.setHorizontalAlignment(SwingConstants.CENTER);
         table.getColumnModel().getColumn(0).setCellEditor(new DefaultCellEditor(checkPrototype));
+        table.getColumnModel().getColumn(0).setCellRenderer(new BuiltinAwareCheckboxRenderer());
         table.getColumnModel().getColumn(3).setCellRenderer(new OperationCellRenderer());
         table.getColumnModel().getColumn(3).setCellEditor(new OperationCellEditor());
 
@@ -125,7 +133,7 @@ public final class CommandManagementPanel extends JPanel {
             refreshTable();
         });
         addButton.addActionListener(e -> openEditDialog(null));
-        batchDeleteButton.addActionListener(e -> batchDeleteSelectedCommands());
+        batchDeleteButton.addActionListener(e -> batchDeleteSelected());
         refreshTable();
     }
 
@@ -134,9 +142,9 @@ public final class CommandManagementPanel extends JPanel {
         table.setAutoResizeMode(JTable.AUTO_RESIZE_ALL_COLUMNS);
         table.getColumnModel().getColumn(0).setPreferredWidth(JBUI.scale(44));
         table.getColumnModel().getColumn(0).setMaxWidth(JBUI.scale(56));
-        table.getColumnModel().getColumn(1).setPreferredWidth(220);
-        table.getColumnModel().getColumn(2).setPreferredWidth(520);
-        table.getColumnModel().getColumn(3).setPreferredWidth(260);
+        table.getColumnModel().getColumn(1).setPreferredWidth(180);
+        table.getColumnModel().getColumn(2).setPreferredWidth(420);
+        table.getColumnModel().getColumn(3).setPreferredWidth(320);
         table.getTableHeader().setReorderingAllowed(false);
         table.setIntercellSpacing(new java.awt.Dimension(8, 4));
         table.setShowGrid(false);
@@ -163,79 +171,89 @@ public final class CommandManagementPanel extends JPanel {
                 table,
                 0,
                 headerRenderer,
-                MyMessageBundle.message("command.manager.header.masterSelect.tooltip"));
+                MyMessageBundle.message("fileMatch.manager.header.masterSelect.tooltip"));
     }
 
     private void refreshTable() {
         String keyword = nameSearchField.getText().trim().toLowerCase();
-        visibleCommandIds.clear();
+        visibleRuleIds.clear();
         tableModel.setRowCount(0);
-        for (CommandTemplate command : stateService.getCommands()) {
-            if (!contains(command.getName(), keyword)) {
+        for (FileMatchRule rule : stateService.getAllFileMatchRulesForDisplay()) {
+            String displayName = BuiltinFileMatchRules.isBuiltinId(rule.getId())
+                    ? BuiltinFileMatchRules.displayNameForId(rule.getId())
+                    : rule.getName();
+            String regex = rule.getPattern() == null ? "" : rule.getPattern();
+            if (!matchesKeyword(displayName, regex, keyword)) {
                 continue;
             }
-            visibleCommandIds.add(command.getId());
+            visibleRuleIds.add(rule.getId());
             tableModel.addRow(new Object[]{
-                    Boolean.FALSE,
-                    command.getName(),
-                    command.getContent(),
-                    MyMessageBundle.message("command.manager.col.operation")
+                    BuiltinFileMatchRules.isBuiltinId(rule.getId()) ? null : Boolean.FALSE,
+                    displayName,
+                    regex,
+                    MyMessageBundle.message("fileMatch.manager.col.operation")
             });
         }
     }
 
-    private void batchDeleteSelectedCommands() {
+    private static boolean matchesKeyword(String name, String regex, String keyword) {
+        if (keyword == null || keyword.isBlank()) {
+            return true;
+        }
+        String n = name == null ? "" : name.toLowerCase();
+        String r = regex == null ? "" : regex.toLowerCase();
+        return n.contains(keyword) || r.contains(keyword);
+    }
+
+    private void batchDeleteSelected() {
         List<String> ids = new ArrayList<>();
         for (int r = 0; r < tableModel.getRowCount(); r++) {
             if (Boolean.TRUE.equals(tableModel.getValueAt(r, 0))) {
-                ids.add(visibleCommandIds.get(r));
+                String id = visibleRuleIds.get(r);
+                if (!BuiltinFileMatchRules.isBuiltinId(id)) {
+                    ids.add(id);
+                }
             }
         }
         if (ids.isEmpty()) {
             JOptionPane.showMessageDialog(
                     this,
-                    MyMessageBundle.message("command.manager.batchDelete.none"),
-                    MyMessageBundle.message("command.manager.batchDelete"),
+                    MyMessageBundle.message("fileMatch.manager.batchDelete.none"),
+                    MyMessageBundle.message("fileMatch.manager.batchDelete"),
                     JOptionPane.INFORMATION_MESSAGE);
             return;
         }
         int confirm = JOptionPane.showConfirmDialog(
                 this,
-                MyMessageBundle.message("command.manager.confirm.batchDelete", ids.size()),
-                MyMessageBundle.message("command.manager.batchDelete"),
+                MyMessageBundle.message("fileMatch.manager.confirm.batchDelete", ids.size()),
+                MyMessageBundle.message("fileMatch.manager.batchDelete"),
                 JOptionPane.OK_CANCEL_OPTION,
                 JOptionPane.WARNING_MESSAGE);
         if (confirm != JOptionPane.OK_OPTION) {
             return;
         }
         for (String id : ids) {
-            stateService.deleteCommandById(id);
+            stateService.deleteUserFileMatchRuleById(id);
         }
         refreshTable();
     }
 
-    private static boolean contains(String source, String keyword) {
-        if (keyword == null || keyword.isBlank()) {
-            return true;
-        }
-        return source != null && source.toLowerCase().contains(keyword);
-    }
-
-    private CommandTemplate commandAtRow(int row) {
-        if (row < 0 || row >= visibleCommandIds.size()) {
+    private FileMatchRule ruleAtRow(int row) {
+        if (row < 0 || row >= visibleRuleIds.size()) {
             return null;
         }
-        String id = visibleCommandIds.get(row);
-        for (CommandTemplate command : stateService.getCommands()) {
-            if (Objects.equals(id, command.getId())) {
-                return command;
-            }
+        String id = visibleRuleIds.get(row);
+        if (BuiltinFileMatchRules.isBuiltinId(id)) {
+            return BuiltinFileMatchRules.builtinRules().stream()
+                    .filter(r -> Objects.equals(id, r.getId()))
+                    .findFirst()
+                    .orElse(null);
         }
-        return null;
+        return stateService.findUserFileMatchRuleById(id).orElse(null);
     }
 
-    private void openEditDialog(CommandTemplate existing) {
-        CommandFormDialog dialog = new CommandFormDialog(existing);
+    private void openEditDialog(FileMatchRule existingUserRule) {
+        RuleFormDialog dialog = new RuleFormDialog(existingUserRule);
         dialog.setVisible(true);
         if (dialog.isSaved()) {
             refreshTable();
@@ -243,47 +261,59 @@ public final class CommandManagementPanel extends JPanel {
     }
 
     private final class OperationCellEditor extends AbstractCellEditor implements TableCellEditor {
-        private final JPanel panel;
+        private final JPanel panelBuiltin;
+        private final JPanel panelUser;
+        private final JButton builtinCopyButton;
         private final JButton editButton;
         private final JButton deleteButton;
         private final JButton copyButton;
         private int row = -1;
 
         private OperationCellEditor() {
-            panel = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 0));
-            editButton = new JButton(MyMessageBundle.message("command.manager.edit"));
-            deleteButton = new JButton(MyMessageBundle.message("command.manager.delete"));
+            panelBuiltin = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 0));
+            builtinCopyButton = new JButton(MyMessageBundle.message("common.copy"));
+            panelBuiltin.add(new JLabel(MyMessageBundle.message("fileMatch.manager.builtin.readonly")));
+            panelBuiltin.add(builtinCopyButton);
+            panelBuiltin.setBorder(javax.swing.BorderFactory.createEmptyBorder(2, 6, 2, 0));
+
+            panelUser = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 0));
+            editButton = new JButton(MyMessageBundle.message("fileMatch.manager.edit"));
+            deleteButton = new JButton(MyMessageBundle.message("fileMatch.manager.delete"));
             copyButton = new JButton(MyMessageBundle.message("common.copy"));
-            panel.add(editButton);
-            panel.add(deleteButton);
-            panel.add(copyButton);
-            panel.setBorder(javax.swing.BorderFactory.createEmptyBorder(2, 6, 2, 0));
+            panelUser.add(editButton);
+            panelUser.add(deleteButton);
+            panelUser.add(copyButton);
+            panelUser.setBorder(javax.swing.BorderFactory.createEmptyBorder(2, 6, 2, 0));
             editButton.addActionListener(e -> {
                 stopCellEditing();
-                CommandTemplate command = commandAtRow(row);
-                if (command != null) {
-                    openEditDialog(command);
+                FileMatchRule rule = ruleAtRow(row);
+                if (rule != null && !BuiltinFileMatchRules.isBuiltinId(rule.getId())) {
+                    openEditDialog(rule);
                 }
             });
             deleteButton.addActionListener(e -> {
                 stopCellEditing();
-                CommandTemplate command = commandAtRow(row);
-                if (command == null) {
+                FileMatchRule rule = ruleAtRow(row);
+                if (rule == null || BuiltinFileMatchRules.isBuiltinId(rule.getId())) {
                     return;
                 }
                 int confirm = JOptionPane.showConfirmDialog(
-                        CommandManagementPanel.this,
-                        MyMessageBundle.message("command.manager.confirm.delete", command.getName()),
-                        MyMessageBundle.message("command.manager.delete"),
+                        FileMatchRuleManagementPanel.this,
+                        MyMessageBundle.message("fileMatch.manager.confirm.delete", rule.getName()),
+                        MyMessageBundle.message("fileMatch.manager.delete"),
                         JOptionPane.OK_CANCEL_OPTION,
                         JOptionPane.WARNING_MESSAGE
                 );
                 if (confirm == JOptionPane.OK_OPTION) {
-                    stateService.deleteCommandById(command.getId());
+                    stateService.deleteUserFileMatchRuleById(rule.getId());
                     refreshTable();
                 }
             });
             copyButton.addActionListener(e -> {
+                stopCellEditing();
+                copyRowAt(row, 1, 2);
+            });
+            builtinCopyButton.addActionListener(e -> {
                 stopCellEditing();
                 copyRowAt(row, 1, 2);
             });
@@ -297,29 +327,37 @@ public final class CommandManagementPanel extends JPanel {
         @Override
         public Component getTableCellEditorComponent(JTable table, Object value, boolean isSelected, int row, int column) {
             this.row = row;
-            return panel;
+            String id = visibleRuleIds.get(row);
+            return BuiltinFileMatchRules.isBuiltinId(id) ? panelBuiltin : panelUser;
         }
     }
 
-    private static final class OperationCellRenderer implements TableCellRenderer {
-        private final JPanel panel = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 0));
-        private final JButton editButton = new JButton(MyMessageBundle.message("command.manager.edit"));
-        private final JButton deleteButton = new JButton(MyMessageBundle.message("command.manager.delete"));
+    private final class OperationCellRenderer implements TableCellRenderer {
+        private final JPanel panelBuiltin = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 0));
+        private final JPanel panelUser = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 0));
+        private final JButton builtinCopyButton = new JButton(MyMessageBundle.message("common.copy"));
+        private final JButton editButton = new JButton(MyMessageBundle.message("fileMatch.manager.edit"));
+        private final JButton deleteButton = new JButton(MyMessageBundle.message("fileMatch.manager.delete"));
         private final JButton copyButton = new JButton(MyMessageBundle.message("common.copy"));
 
         private OperationCellRenderer() {
-            panel.add(editButton);
-            panel.add(deleteButton);
-            panel.add(copyButton);
-            panel.setBorder(javax.swing.BorderFactory.createEmptyBorder(2, 6, 2, 0));
+            panelBuiltin.add(new JLabel(MyMessageBundle.message("fileMatch.manager.builtin.readonly")));
+            panelBuiltin.add(builtinCopyButton);
+            panelUser.add(editButton);
+            panelUser.add(deleteButton);
+            panelUser.add(copyButton);
+            panelBuiltin.setBorder(javax.swing.BorderFactory.createEmptyBorder(2, 6, 2, 0));
+            panelUser.setBorder(javax.swing.BorderFactory.createEmptyBorder(2, 6, 2, 0));
             Color bg = UIManager.getColor("Button.background");
             Color fg = UIManager.getColor("Button.foreground");
             if (bg != null) {
+                builtinCopyButton.setBackground(bg);
                 editButton.setBackground(bg);
                 deleteButton.setBackground(bg);
                 copyButton.setBackground(bg);
             }
             if (fg != null) {
+                builtinCopyButton.setForeground(fg);
                 editButton.setForeground(fg);
                 deleteButton.setForeground(fg);
                 copyButton.setForeground(fg);
@@ -328,43 +366,41 @@ public final class CommandManagementPanel extends JPanel {
 
         @Override
         public Component getTableCellRendererComponent(JTable table, Object value, boolean isSelected, boolean hasFocus, int row, int column) {
-            panel.setBackground(table.getBackground());
-            return panel;
+            panelUser.setBackground(table.getBackground());
+            panelBuiltin.setBackground(table.getBackground());
+            if (row >= 0 && row < visibleRuleIds.size()
+                    && BuiltinFileMatchRules.isBuiltinId(visibleRuleIds.get(row))) {
+                return panelBuiltin;
+            }
+            return panelUser;
         }
     }
 
-    private final class CommandFormDialog extends JDialog {
+    private final class RuleFormDialog extends JDialog {
         private final JTextField nameField = new JTextField();
-        private final JTextArea commandArea = new JTextArea(10, 56);
+        private final JTextField regexField = new JTextField();
         private final JLabel nameError = errorLabel();
-        private final JLabel commandError = errorLabel();
-        private final CommandTemplate existing;
+        private final JLabel regexError = errorLabel();
+        private final FileMatchRule existing;
         private boolean saved;
 
-        private CommandFormDialog(CommandTemplate existing) {
+        private RuleFormDialog(FileMatchRule existing) {
             super((java.awt.Frame) null, true);
             this.existing = existing;
-            setTitle(existing == null ? MyMessageBundle.message("command.manager.add") : MyMessageBundle.message("command.manager.edit"));
+            setTitle(existing == null ? MyMessageBundle.message("fileMatch.manager.add") : MyMessageBundle.message("fileMatch.manager.edit"));
             setLayout(new BorderLayout());
-
-            commandArea.setLineWrap(true);
-            commandArea.setWrapStyleWord(true);
-            commandArea.setTabSize(4);
-            JBScrollPane commandScroll = new JBScrollPane(commandArea);
-            commandScroll.setPreferredSize(new java.awt.Dimension(JBUI.scale(460), JBUI.scale(200)));
-            commandScroll.setMinimumSize(new java.awt.Dimension(JBUI.scale(360), JBUI.scale(120)));
 
             JPanel form = new JPanel(new GridBagLayout());
             GridBagConstraints gbc = new GridBagConstraints();
             gbc.insets = new Insets(4, 4, 2, 4);
             gbc.fill = GridBagConstraints.HORIZONTAL;
             int row = 0;
-            addField(form, gbc, row++, MyMessageBundle.message("command.manager.col.name"), nameField, nameError);
-            addCommandField(form, gbc, row, MyMessageBundle.message("command.manager.col.command"), commandScroll, commandError);
+            addField(form, gbc, row++, MyMessageBundle.message("fileMatch.manager.col.name"), nameField, nameError);
+            addField(form, gbc, row, MyMessageBundle.message("fileMatch.manager.col.regex"), regexField, regexError);
 
             JPanel buttons = new JPanel(new FlowLayout(FlowLayout.RIGHT));
-            JButton saveBtn = new JButton(MyMessageBundle.message("command.manager.save"));
-            JButton cancelBtn = new JButton(MyMessageBundle.message("command.manager.cancel"));
+            JButton saveBtn = new JButton(MyMessageBundle.message("fileMatch.manager.save"));
+            JButton cancelBtn = new JButton(MyMessageBundle.message("fileMatch.manager.cancel"));
             buttons.add(saveBtn);
             buttons.add(cancelBtn);
 
@@ -373,33 +409,34 @@ public final class CommandManagementPanel extends JPanel {
 
             if (existing != null) {
                 nameField.setText(existing.getName());
-                commandArea.setText(existing.getContent());
+                regexField.setText(existing.getPattern());
             }
 
-            applyIdeaFont(nameField, commandArea);
+            applyIdeaFont(nameField, regexField);
             applyCompactSearchField(nameField);
+            applyCompactSearchField(regexField);
 
-            saveBtn.addActionListener(e -> saveCommand());
+            saveBtn.addActionListener(e -> saveRule());
             cancelBtn.addActionListener(e -> dispose());
 
-            setSize(JBUI.scale(520), JBUI.scale(440));
-            setMinimumSize(new java.awt.Dimension(JBUI.scale(480), JBUI.scale(380)));
-            setLocationRelativeTo(SwingUtilities.getWindowAncestor(CommandManagementPanel.this));
+            setSize(JBUI.scale(520), JBUI.scale(220));
+            setMinimumSize(new java.awt.Dimension(JBUI.scale(480), JBUI.scale(180)));
+            setLocationRelativeTo(SwingUtilities.getWindowAncestor(FileMatchRuleManagementPanel.this));
         }
 
         private boolean isSaved() {
             return saved;
         }
 
-        private void saveCommand() {
+        private void saveRule() {
             clearErrors();
             if (!validateInputs()) {
                 return;
             }
-            CommandTemplate command = existing == null ? new CommandTemplate() : existing;
-            command.setName(nameField.getText().trim());
-            command.setContent(commandArea.getText().trim());
-            stateService.upsertCommand(command);
+            FileMatchRule rule = existing == null ? new FileMatchRule() : existing;
+            rule.setName(nameField.getText().trim());
+            rule.setPattern(regexField.getText().trim());
+            stateService.upsertUserFileMatchRule(rule);
             saved = true;
             dispose();
         }
@@ -407,30 +444,37 @@ public final class CommandManagementPanel extends JPanel {
         private boolean validateInputs() {
             boolean ok = true;
             String name = nameField.getText().trim();
-            String content = commandArea.getText().trim();
+            String patternStr = regexField.getText().trim();
             if (name.isBlank()) {
-                nameError.setText(MyMessageBundle.message("command.manager.error.nameRequired"));
+                nameError.setText(MyMessageBundle.message("fileMatch.manager.error.nameRequired"));
                 ok = false;
             } else {
-                boolean duplicate = stateService.getCommands().stream().anyMatch(c ->
-                        !Objects.equals(existing == null ? null : existing.getId(), c.getId())
-                                && c.getName() != null
-                                && c.getName().equalsIgnoreCase(name));
+                boolean duplicate = stateService.getUserFileMatchRules().stream().anyMatch(r ->
+                        !Objects.equals(existing == null ? null : existing.getId(), r.getId())
+                                && r.getName() != null
+                                && r.getName().equalsIgnoreCase(name));
                 if (duplicate) {
-                    nameError.setText(MyMessageBundle.message("command.manager.error.nameDuplicate"));
+                    nameError.setText(MyMessageBundle.message("fileMatch.manager.error.nameDuplicate"));
                     ok = false;
                 }
             }
-            if (content.isBlank()) {
-                commandError.setText(MyMessageBundle.message("command.manager.error.commandRequired"));
+            if (patternStr.isBlank()) {
+                regexError.setText(MyMessageBundle.message("fileMatch.manager.error.regexRequired"));
                 ok = false;
+            } else {
+                try {
+                    Pattern.compile(patternStr);
+                } catch (PatternSyntaxException ex) {
+                    regexError.setText(MyMessageBundle.message("fileMatch.manager.error.regexInvalid"));
+                    ok = false;
+                }
             }
             return ok;
         }
 
         private void clearErrors() {
             nameError.setText(" ");
-            commandError.setText(" ");
+            regexError.setText(" ");
         }
 
         private JLabel errorLabel() {
@@ -466,41 +510,6 @@ public final class CommandManagementPanel extends JPanel {
             form.add(error, gbc);
             gbc.insets = new Insets(4, 4, 2, 4);
         }
-
-        /**
-         * 多行命令区：横向占满、竖向可随窗口拉伸，便于编辑长命令。
-         */
-        private void addCommandField(JPanel form,
-                                     GridBagConstraints gbc,
-                                     int row,
-                                     String title,
-                                     java.awt.Component commandEditor,
-                                     JLabel error) {
-            gbc.gridx = 0;
-            gbc.gridy = row * 2;
-            gbc.gridwidth = 1;
-            gbc.weightx = 0;
-            gbc.weighty = 0;
-            gbc.fill = GridBagConstraints.NONE;
-            gbc.anchor = GridBagConstraints.NORTHWEST;
-            form.add(new JLabel(title), gbc);
-
-            gbc.gridx = 1;
-            gbc.weightx = 1;
-            gbc.weighty = 1;
-            gbc.fill = GridBagConstraints.BOTH;
-            gbc.anchor = GridBagConstraints.CENTER;
-            form.add(commandEditor, gbc);
-
-            gbc.gridx = 1;
-            gbc.gridy = row * 2 + 1;
-            gbc.weightx = 1;
-            gbc.weighty = 0;
-            gbc.fill = GridBagConstraints.HORIZONTAL;
-            gbc.insets = new Insets(0, 4, 6, 4);
-            form.add(error, gbc);
-            gbc.insets = new Insets(4, 4, 2, 4);
-        }
     }
 
     private static void applyIdeaFont(JComponent... components) {
@@ -515,11 +524,11 @@ public final class CommandManagementPanel extends JPanel {
 
     private static void applyCompactSearchField(JTextField field) {
         int minW = JBUI.scale(100);
-        int prefW = JBUI.scale(200);
+        int prefW = JBUI.scale(360);
         java.awt.Dimension h = field.getPreferredSize();
         field.setMinimumSize(new java.awt.Dimension(minW, h.height));
         field.setPreferredSize(new java.awt.Dimension(prefW, h.height));
-        field.setMaximumSize(new java.awt.Dimension(prefW + JBUI.scale(40), h.height));
+        field.setMaximumSize(new java.awt.Dimension(prefW + JBUI.scale(120), h.height));
     }
 
     private void copyRowAt(int row, int startColumn, int endColumn) {
@@ -536,5 +545,28 @@ public final class CommandManagementPanel extends JPanel {
             sb.append(header).append("：").append(value);
         }
         Toolkit.getDefaultToolkit().getSystemClipboard().setContents(new StringSelection(sb.toString()), null);
+    }
+
+    private final class BuiltinAwareCheckboxRenderer extends JCheckBox implements TableCellRenderer {
+        private BuiltinAwareCheckboxRenderer() {
+            setHorizontalAlignment(SwingConstants.CENTER);
+            setOpaque(true);
+        }
+
+        @Override
+        public Component getTableCellRendererComponent(JTable table,
+                                                       Object value,
+                                                       boolean isSelected,
+                                                       boolean hasFocus,
+                                                       int row,
+                                                       int column) {
+            boolean builtin = row >= 0
+                    && row < visibleRuleIds.size()
+                    && BuiltinFileMatchRules.isBuiltinId(visibleRuleIds.get(row));
+            setEnabled(!builtin);
+            setSelected(!builtin && Boolean.TRUE.equals(value));
+            setBackground(table.getBackground());
+            return this;
+        }
     }
 }

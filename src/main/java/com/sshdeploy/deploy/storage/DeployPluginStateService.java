@@ -1,6 +1,8 @@
 package com.sshdeploy.deploy.storage;
 
+import com.sshdeploy.deploy.domain.BuiltinFileMatchRules;
 import com.sshdeploy.deploy.domain.CommandTemplate;
+import com.sshdeploy.deploy.domain.FileMatchRule;
 import com.sshdeploy.deploy.domain.DeployProfile;
 import com.sshdeploy.deploy.domain.ServerProfile;
 import com.sshdeploy.deploy.domain.UploadConfig;
@@ -38,6 +40,9 @@ public final class DeployPluginStateService implements PersistentStateComponent<
     @Override
     public void loadState(@NotNull State state) {
         this.state = state;
+        if (this.state.fileMatchRules == null) {
+            this.state.fileMatchRules = new ArrayList<>();
+        }
     }
 
     public List<ServerProfile> getServers() {
@@ -84,6 +89,39 @@ public final class DeployPluginStateService implements PersistentStateComponent<
 
     public boolean deleteCommandById(String id) {
         return deleteById(state.commands, CommandTemplate::getId, id);
+    }
+
+    public List<FileMatchRule> getUserFileMatchRules() {
+        return state.fileMatchRules;
+    }
+
+    /**
+     * Built-in rules first (fixed order), then user rules sorted by name (case-insensitive).
+     */
+    public List<FileMatchRule> getAllFileMatchRulesForDisplay() {
+        List<FileMatchRule> result = new ArrayList<>(BuiltinFileMatchRules.builtinRules());
+        List<FileMatchRule> users = new ArrayList<>(state.fileMatchRules);
+        users.sort(Comparator.comparing(FileMatchRule::getName, String.CASE_INSENSITIVE_ORDER));
+        result.addAll(users);
+        return result;
+    }
+
+    public Optional<FileMatchRule> findUserFileMatchRuleById(String id) {
+        return findById(state.fileMatchRules, FileMatchRule::getId, id);
+    }
+
+    public void upsertUserFileMatchRule(@NotNull FileMatchRule rule) {
+        if (BuiltinFileMatchRules.isBuiltinId(rule.getId())) {
+            throw new IllegalArgumentException("Cannot persist built-in rule id.");
+        }
+        upsert(state.fileMatchRules, FileMatchRule::getId, FileMatchRule::setId, rule);
+    }
+
+    public boolean deleteUserFileMatchRuleById(String id) {
+        if (BuiltinFileMatchRules.isBuiltinId(id)) {
+            return false;
+        }
+        return deleteById(state.fileMatchRules, FileMatchRule::getId, id);
     }
 
     public List<UploadConfig> getUploads() {
@@ -168,6 +206,7 @@ public final class DeployPluginStateService implements PersistentStateComponent<
     public static final class State {
         public List<ServerProfile> servers = new ArrayList<>();
         public List<CommandTemplate> commands = new ArrayList<>();
+        public List<FileMatchRule> fileMatchRules = new ArrayList<>();
         public List<UploadConfig> uploads = new ArrayList<>();
         public List<DeployProfile> deployProfiles = new ArrayList<>();
     }

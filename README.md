@@ -11,7 +11,7 @@
 
 [**简体中文**](README_zh_CN.md)
 
-**SSH Deploy** helps you manage SSH servers, reusable remote commands, and deployment profiles inside the IDE. Run an optional local build (Maven/Gradle), upload via SFTP, execute **before/after** shell steps with streaming logs, and optionally open **Terminal** for follow-up work—the same pipeline is available from the **SSH Deploy** tool window and from a **Run/Debug configuration**.
+**SSH Deploy** helps you manage SSH servers, reusable remote commands, and file-match presets inside the IDE. Run an optional local build (Maven/Gradle), upload via SFTP, execute **before/after** shell steps with streaming logs, and optionally open **Terminal** for follow-up work—the main flow is a **Run/Debug configuration**; the tool window holds server/command/preset management and a log console.
 
 The scope is intentionally narrow: host management, upload, and command execution—similar in spirit to lightweight deploy tooling, without cloud-console extras.
 
@@ -21,9 +21,10 @@ The scope is intentionally narrow: host management, upload, and command executio
 ## Features
 
 - [x] Add / edit / remove / search **SSH server** profiles (password or private key)
-- [x] **Command templates** — save snippets and reuse them in deploy profiles or Run configurations
+- [x] **Command templates** — save snippets and reuse them in Run configurations (and in stored deploy profiles when imported)
+- [x] **File match rules** — built-in presets (read-only) plus your own name + regex rules; in **Run/Debug**, “Directory pattern” mode lists them under **Select regex** (use **Apply** to copy into the regex field)
 - [x] **Upload pipeline** — optional local build, SFTP upload, remote commands **before** and **after** upload, optional **Terminal** tab
-- [x] **Run/Debug configuration** — choose server, local artifact (file or directory + pattern), remote path, before/after commands, optional one-line terminal command after success
+- [x] **Run/Debug configuration** — choose server, local artifact (file or directory + regex), remote path, before/after commands, optional one-line terminal command after success
 - [x] Placeholder **`${fileName}`** in remote commands for the uploaded artifact name (e.g. versioned JAR)
 - [x] Import **Alibaba Cloud Toolkit (ACT)**-style XML for faster migration
 - [x] **English** and **Simplified Chinese** UI (follow IDE language or override in Settings)
@@ -36,18 +37,20 @@ The scope is intentionally narrow: host management, upload, and command executio
 
 ## Usage (overview)
 
-**Tool window**
+**Tool window** (nested tabs inside **SSH Deploy**)
 
 1. Open **View → Tool Windows → SSH Deploy** (or the tool window button on the right).
-2. Under **Servers**, add hosts and credentials (IDE Password Safe supported).
-3. Under **Commands**, maintain reusable shell lines.
-4. Under **Deploy**, link server, upload mapping, and optional before/after or terminal steps—then **Deploy**, **Test connection**, or **Dry run**.
+2. **Servers** — add hosts and credentials (IDE Password Safe supported).
+3. **Commands** — maintain reusable shell lines for Run configurations.
+4. **File match rules** — optional: add named regex presets; built-in rows cannot be deleted. These populate **Select regex** in Run configuration when upload mode is **Directory pattern**.
+5. **Console** — stream log output from deploy actions that report here.
 
 **Run/Debug**
 
 1. **Run → Edit Configurations → + → SSH Deploy**
-2. Pick server, local upload source, remote directory, and optional commands / terminal line.
-3. Run; logs appear in the **Run** tool window.
+2. Pick server, local upload source (direct file or directory + file match regex), remote directory, and optional commands / terminal line.
+3. In **Directory pattern** mode, choose a preset under **Select regex** and click **Apply** to fill the regex field (you can still edit the text).
+4. Run; logs appear in the **Run** tool window.
 
 ## Development
 

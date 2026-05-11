@@ -3,6 +3,7 @@ package com.sshdeploy;
 import com.sshdeploy.deploy.security.PasswordSafeCredentialStore;
 import com.sshdeploy.deploy.storage.DeployPluginStateService;
 import com.sshdeploy.deploy.ui.command.CommandManagementPanel;
+import com.sshdeploy.deploy.ui.filematch.FileMatchRuleManagementPanel;
 import com.sshdeploy.deploy.ui.console.DeployConsolePanel;
 import com.sshdeploy.deploy.ui.server.ServerManagementPanel;
 import com.intellij.openapi.project.Project;
@@ -28,6 +29,8 @@ public final class MyToolWindowFactory implements ToolWindowFactory {
                 new ServerManagementPanel(stateService, credentialStore));
         tabs.addTab(MyMessageBundle.message("toolwindow.tab.commands"),
                 new CommandManagementPanel(stateService));
+        tabs.addTab(MyMessageBundle.message("toolwindow.tab.fileMatch"),
+                new FileMatchRuleManagementPanel(stateService));
         tabs.addTab(MyMessageBundle.message("toolwindow.tab.console"),
                 new DeployConsolePanel(project));
 

@@ -46,6 +46,8 @@ import java.awt.FlowLayout;
 import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
 import java.awt.Insets;
+import java.awt.Toolkit;
+import java.awt.datatransfer.StringSelection;
 import java.util.Objects;
 
 public final class ServerManagementPanel extends JPanel {
@@ -89,12 +91,10 @@ public final class ServerManagementPanel extends JPanel {
                 return column == 0 || column == 6;
             }
         };
-        this.table.setRowSelectionAllowed(false);
-        this.table.setColumnSelectionAllowed(false);
-        this.table.setCellSelectionEnabled(false);
-        this.table.setFocusable(false);
-        this.table.setSelectionBackground(this.table.getBackground());
-        this.table.setSelectionForeground(this.table.getForeground());
+        this.table.setRowSelectionAllowed(true);
+        this.table.setColumnSelectionAllowed(true);
+        this.table.setCellSelectionEnabled(true);
+        this.table.setFocusable(true);
         this.nameSearchField = new JTextField();
         this.hostSearchField = new JTextField();
         applyIdeaFont(nameSearchField, hostSearchField);
@@ -261,7 +261,7 @@ public final class ServerManagementPanel extends JPanel {
         table.getColumnModel().getColumn(3).setPreferredWidth(80);
         table.getColumnModel().getColumn(4).setPreferredWidth(140);
         table.getColumnModel().getColumn(5).setPreferredWidth(180);
-        table.getColumnModel().getColumn(6).setPreferredWidth(220);
+        table.getColumnModel().getColumn(6).setPreferredWidth(300);
         table.getTableHeader().setReorderingAllowed(false);
         table.setIntercellSpacing(new java.awt.Dimension(8, 4));
         table.setShowGrid(false);
@@ -302,14 +302,17 @@ public final class ServerManagementPanel extends JPanel {
         private final JPanel panel;
         private final JButton editButton;
         private final JButton deleteButton;
+        private final JButton copyButton;
         private int row = -1;
 
         private OperationCellEditor() {
             panel = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 0));
             editButton = new JButton(MyMessageBundle.message("server.manager.edit"));
             deleteButton = new JButton(MyMessageBundle.message("server.manager.delete"));
+            copyButton = new JButton(MyMessageBundle.message("common.copy"));
             panel.add(editButton);
             panel.add(deleteButton);
+            panel.add(copyButton);
             panel.setBorder(javax.swing.BorderFactory.createEmptyBorder(2, 6, 2, 0));
             editButton.addActionListener(e -> {
                 stopCellEditing();
@@ -340,6 +343,10 @@ public final class ServerManagementPanel extends JPanel {
                 }
                 refreshTable();
             });
+            copyButton.addActionListener(e -> {
+                stopCellEditing();
+                copyRowAt(row, 1, 5);
+            });
         }
 
         @Override
@@ -358,20 +365,24 @@ public final class ServerManagementPanel extends JPanel {
         private final JPanel panel = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 0));
         private final JButton editButton = new JButton(MyMessageBundle.message("server.manager.edit"));
         private final JButton deleteButton = new JButton(MyMessageBundle.message("server.manager.delete"));
+        private final JButton copyButton = new JButton(MyMessageBundle.message("common.copy"));
 
         private OperationCellRenderer() {
             panel.add(editButton);
             panel.add(deleteButton);
+            panel.add(copyButton);
             panel.setBorder(javax.swing.BorderFactory.createEmptyBorder(2, 6, 2, 0));
             java.awt.Color bg = UIManager.getColor("Button.background");
             java.awt.Color fg = UIManager.getColor("Button.foreground");
             if (bg != null) {
                 editButton.setBackground(bg);
                 deleteButton.setBackground(bg);
+                copyButton.setBackground(bg);
             }
             if (fg != null) {
                 editButton.setForeground(fg);
                 deleteButton.setForeground(fg);
+                copyButton.setForeground(fg);
             }
         }
 
@@ -678,5 +689,21 @@ public final class ServerManagementPanel extends JPanel {
         portField.setMinimumSize(new java.awt.Dimension(w, h.height));
         portField.setPreferredSize(new java.awt.Dimension(w, h.height));
         portField.setMaximumSize(new java.awt.Dimension(JBUI.scale(90), h.height));
+    }
+
+    private void copyRowAt(int row, int startColumn, int endColumn) {
+        if (row < 0 || row >= tableModel.getRowCount()) {
+            return;
+        }
+        StringBuilder sb = new StringBuilder();
+        for (int col = startColumn; col <= endColumn; col++) {
+            String header = Objects.toString(tableModel.getColumnName(col), "");
+            String value = Objects.toString(tableModel.getValueAt(row, col), "");
+            if (!sb.isEmpty()) {
+                sb.append(System.lineSeparator());
+            }
+            sb.append(header).append("：").append(value);
+        }
+        Toolkit.getDefaultToolkit().getSystemClipboard().setContents(new StringSelection(sb.toString()), null);
     }
 }
