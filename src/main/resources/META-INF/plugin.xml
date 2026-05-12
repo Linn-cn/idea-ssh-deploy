@@ -6,8 +6,9 @@
 
     <description><![CDATA[
     <p><b>English</b></p>
-    <p><b>SSH Deploy</b> uploads build artifacts to remote Linux hosts over <b>SSH</b> from IntelliJ IDEA.
-    It targets scenes that want a simple IDE-centric flow: configure servers and commands once, then upload from the tool window or a Run configuration.</p>
+    <p><b>SSH Deploy</b> uploads build artifacts to remote Linux hosts over <b>SSH/SFTP</b> from <b>IntelliJ IDEA</b> (Community or Ultimate, with bundled Java and Terminal).
+    Configure SSH servers, reusable remote commands, and optional <b>file match rules</b> in the IDE, then run a <b>SSH Deploy</b> <b>Run/Debug configuration</b> to upload and execute your pipeline.
+    The <b>SSH Deploy</b> tool window is for managing servers, commands, file match rules, and viewing streamed console output.</p>
 
     <p><b>Features</b></p>
     <ul>
@@ -19,6 +20,7 @@
         <li><b>Placeholders</b> — use <code>${fileName}</code> in remote commands for the uploaded file name (e.g. versioned JAR).</li>
         <li><b>Import</b> — import <b>Alibaba Cloud Toolkit (ACT)</b> style XML to migrate faster.</li>
         <li><b>Languages</b> — English and Simplified Chinese UI (follow IDE or override in Settings).</li>
+        <li><b>Configuration backup</b> — export or import servers, commands, and user file match rules as JSON from <b>Settings → SSH Deploy</b> (deduplicated import).</li>
     </ul>
 
     <p><b>How to use (Tool window)</b></p>
@@ -40,13 +42,16 @@
         <li>Run the configuration; logs appear in the Run tool window.</li>
     </ol>
 
-    <p><b>Requirements</b>: IntelliJ IDEA with bundled Terminal and Java support. Remote hosts must support standard SSH/SFTP.</p>
+    <p><b>Requirements</b>: IntelliJ IDEA with bundled <b>Terminal</b> and <b>Java</b> support (see <code>sinceBuild</code> in the listing for the minimum IDE build). Remote hosts must support standard <b>SSH</b> and <b>SFTP</b>.</p>
+
+    <p><b>Privacy</b>: SSH credentials are stored using the IDE <b>Password Safe</b> on your machine. The plugin connects only to hosts and paths you configure; it does not send your project data or credentials to third-party servers operated by the plugin vendor.</p>
 
     <hr/>
 
     <p><b>简体中文</b></p>
-    <p><b>SSH Deploy</b> 在 IntelliJ IDEA 中通过 <b>SSH</b> 将本地构建产物上传到远端 Linux 主机。
-    适合希望在 IDE 内完成配置与上传的场景：一次性配置服务器与命令，即可从工具窗口或「运行配置」触发上传流程。</p>
+    <p><b>SSH Deploy</b> 在 <b>IntelliJ IDEA</b>（需带内置 <b>Java</b> 与 <b>Terminal</b> 的 Community 或 Ultimate）中通过 <b>SSH/SFTP</b> 将本地构建产物上传到远端 Linux 主机。
+    在 IDE 内维护 SSH 服务器、可复用的远端命令以及可选的<b>文件匹配规则</b>，再通过 <b>SSH Deploy</b> 的<b>运行/调试配置</b>执行上传与命令流水线。
+    <b>SSH Deploy</b> 工具窗口用于管理服务器、命令、文件匹配规则，以及查看会输出到控制台的日志。</p>
 
     <p><b>功能说明</b></p>
     <ul>
@@ -58,6 +63,7 @@
         <li><b>占位符</b> — 远程命令中可使用 <code>${fileName}</code> 表示本次上传的文件名（例如带版本号的 JAR）。</li>
         <li><b>导入</b> — 支持导入 <b>Alibaba Cloud Toolkit（ACT）</b> 风格的 XML，便于迁移。</li>
         <li><b>语言</b> — 界面支持英文与简体中文（可跟随 IDE 或在设置中指定）。</li>
+        <li><b>配置备份</b> — 在<b>设置 → SSH Deploy</b> 中将服务器、命令、用户文件匹配规则<b>导出/导入 JSON</b>（导入时自动去重）。</li>
     </ul>
 
     <p><b>使用方式（工具窗口）</b></p>
@@ -79,25 +85,22 @@
         <li>运行该配置；日志显示在 <b>运行</b> 工具窗口中。</li>
     </ol>
 
-    <p><b>环境要求</b>：需使用带内置 Terminal 与 Java 插件支持的 IntelliJ IDEA；远端需支持标准 SSH/SFTP。</p>
+    <p><b>环境要求</b>：需使用带内置 <b>Terminal</b> 与 <b>Java</b> 支持的 IntelliJ IDEA（上架信息中的 <code>sinceBuild</code> 表示最低兼容构建号）；远端需支持标准 <b>SSH</b> 与 <b>SFTP</b>。</p>
+
+    <p><b>隐私与数据</b>：SSH 凭据通过 IDE <b>密码保险箱</b>保存在本机。插件仅向您自行配置的主机与路径发起连接，不会将您的工程数据或凭据发送到插件作者运营的第三方服务器。</p>
     ]]></description>
 
     <change-notes><![CDATA[
-    <p><b>Unreleased</b></p>
+    <b>0.0.1</b> — Initial release.<br/>
     <ul>
-        <li><b>File match rules</b> tool-window tab — built-in presets plus user-managed name/regex rows; Run configuration <b>Select regex</b> + <b>Apply</b> fills the directory-mode pattern.</li>
-    </ul>
-    <hr/>
-    <b>1.0.0</b> — Initial release.<br>
-    <ul>
-        <li>Server / command / upload / deploy profile management</li>
-        <li>SSH connection with password and private key authentication</li>
-        <li>Deploy pipeline with build / upload / before / after / terminal stages</li>
-        <li>Dry-run and connection test modes</li>
-        <li>ToolWindow deploy panel with real-time logs</li>
-        <li>Run/Debug configuration for deployment</li>
-        <li>ACT configuration import</li>
-        <li>i18n support</li>
+        <li>SSH server profiles (password or private key), credentials via IDE Password Safe</li>
+        <li>Reusable command templates for Run/Debug configurations</li>
+        <li>File match rules (built-in + user-defined); Run configuration <b>Select regex</b> + <b>Apply</b> in directory upload mode</li>
+        <li>Run/Debug configuration: SFTP upload, optional local Maven/Gradle build, before/after remote commands, optional post-success terminal command</li>
+        <li>Tool window: Servers, Commands, File match rules, Console</li>
+        <li>Import Alibaba Cloud Toolkit (ACT) style XML</li>
+        <li>English and Simplified Chinese UI (Settings → SSH Deploy)</li>
+        <li>JSON configuration backup: export/import servers, commands, and user file match rules (deduplicated import)</li>
     </ul>
     ]]></change-notes>
 
