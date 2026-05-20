@@ -3,7 +3,10 @@ package com.sshdeploy.deploy.ui.command;
 import com.sshdeploy.MyMessageBundle;
 import com.sshdeploy.deploy.domain.CommandTemplate;
 import com.sshdeploy.deploy.storage.DeployPluginStateService;
+import com.sshdeploy.deploy.ui.common.CommandContentPreview;
+import com.sshdeploy.deploy.ui.common.CommandEditorSupport;
 import com.sshdeploy.deploy.ui.common.MasterCheckboxColumnHeaderSupport;
+import com.intellij.ui.EditorTextField;
 import com.intellij.ui.components.JBScrollPane;
 import com.intellij.util.ui.JBUI;
 
@@ -18,7 +21,6 @@ import javax.swing.JLabel;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JTable;
-import javax.swing.JTextArea;
 import javax.swing.JTextField;
 import javax.swing.SwingConstants;
 import javax.swing.SwingUtilities;
@@ -41,6 +43,8 @@ import java.util.List;
 import java.util.Objects;
 
 public final class CommandManagementPanel extends JPanel {
+    private static final int COMMAND_PREVIEW_MAX_LINES = 5;
+
     private final DeployPluginStateService stateService;
     private final DefaultTableModel tableModel;
     private final JTable table;
@@ -141,12 +145,11 @@ public final class CommandManagementPanel extends JPanel {
         table.setIntercellSpacing(new java.awt.Dimension(8, 4));
         table.setShowGrid(false);
 
-        javax.swing.table.DefaultTableCellRenderer leftCellRenderer = new javax.swing.table.DefaultTableCellRenderer();
-        leftCellRenderer.setHorizontalAlignment(SwingConstants.LEFT);
-        leftCellRenderer.setBorder(javax.swing.BorderFactory.createEmptyBorder(0, 6, 0, 0));
-        for (int i = 1; i < 3; i++) {
-            table.getColumnModel().getColumn(i).setCellRenderer(leftCellRenderer);
-        }
+        javax.swing.table.DefaultTableCellRenderer nameCellRenderer = new javax.swing.table.DefaultTableCellRenderer();
+        nameCellRenderer.setHorizontalAlignment(SwingConstants.LEFT);
+        nameCellRenderer.setBorder(javax.swing.BorderFactory.createEmptyBorder(0, 6, 0, 0));
+        table.getColumnModel().getColumn(1).setCellRenderer(nameCellRenderer);
+        table.getColumnModel().getColumn(2).setCellRenderer(new MultilineCommandCellRenderer());
 
         TableCellRenderer headerRenderer = table.getTableHeader().getDefaultRenderer();
         for (int i = 1; i < table.getColumnModel().getColumnCount(); i++) {
@@ -181,6 +184,23 @@ public final class CommandManagementPanel extends JPanel {
                     command.getContent(),
                     MyMessageBundle.message("command.manager.col.operation")
             });
+        }
+        adjustCommandColumnRowHeights();
+    }
+
+    private void adjustCommandColumnRowHeights() {
+        if (tableModel.getRowCount() == 0) {
+            return;
+        }
+        Font font = table.getFont();
+        int lineHeight = table.getFontMetrics(font).getHeight();
+        int verticalPad = JBUI.scale(12);
+        int minHeight = JBUI.scale(44);
+        for (int row = 0; row < tableModel.getRowCount(); row++) {
+            String content = Objects.toString(tableModel.getValueAt(row, 2), "");
+            int lines = CommandContentPreview.displayLineCount(content, COMMAND_PREVIEW_MAX_LINES);
+            int height = Math.max(minHeight, lines * lineHeight + verticalPad);
+            table.setRowHeight(row, height);
         }
     }
 
@@ -301,6 +321,26 @@ public final class CommandManagementPanel extends JPanel {
         }
     }
 
+    private static final class MultilineCommandCellRenderer extends javax.swing.table.DefaultTableCellRenderer {
+        private MultilineCommandCellRenderer() {
+            setHorizontalAlignment(SwingConstants.LEFT);
+            setVerticalAlignment(SwingConstants.TOP);
+            setBorder(javax.swing.BorderFactory.createEmptyBorder(JBUI.scale(6), JBUI.scale(6), JBUI.scale(6), JBUI.scale(6)));
+        }
+
+        @Override
+        public Component getTableCellRendererComponent(JTable table,
+                                                         Object value,
+                                                         boolean isSelected,
+                                                         boolean hasFocus,
+                                                         int row,
+                                                         int column) {
+            super.getTableCellRendererComponent(table, value, isSelected, hasFocus, row, column);
+            setText(CommandContentPreview.toHtml(Objects.toString(value, ""), COMMAND_PREVIEW_MAX_LINES));
+            return this;
+        }
+    }
+
     private static final class OperationCellRenderer implements TableCellRenderer {
         private final JPanel panel = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 0));
         private final JButton editButton = new JButton(MyMessageBundle.message("command.manager.edit"));
@@ -335,7 +375,7 @@ public final class CommandManagementPanel extends JPanel {
 
     private final class CommandFormDialog extends JDialog {
         private final JTextField nameField = new JTextField();
-        private final JTextArea commandArea = new JTextArea(10, 56);
+        private final EditorTextField commandField = CommandEditorSupport.createMultilineField(8);
         private final JLabel nameError = errorLabel();
         private final JLabel commandError = errorLabel();
         private final CommandTemplate existing;
@@ -347,12 +387,9 @@ public final class CommandManagementPanel extends JPanel {
             setTitle(existing == null ? MyMessageBundle.message("command.manager.add") : MyMessageBundle.message("command.manager.edit"));
             setLayout(new BorderLayout());
 
-            commandArea.setLineWrap(true);
-            commandArea.setWrapStyleWord(true);
-            commandArea.setTabSize(4);
-            JBScrollPane commandScroll = new JBScrollPane(commandArea);
-            commandScroll.setPreferredSize(new java.awt.Dimension(JBUI.scale(460), JBUI.scale(200)));
-            commandScroll.setMinimumSize(new java.awt.Dimension(JBUI.scale(360), JBUI.scale(120)));
+            JPanel commandEditorPanel = CommandEditorSupport.wrapWithPlaceholderButton(commandField, this);
+            commandEditorPanel.setPreferredSize(new java.awt.Dimension(JBUI.scale(460), JBUI.scale(200)));
+            commandEditorPanel.setMinimumSize(new java.awt.Dimension(JBUI.scale(360), JBUI.scale(120)));
 
             JPanel form = new JPanel(new GridBagLayout());
             GridBagConstraints gbc = new GridBagConstraints();
@@ -360,7 +397,7 @@ public final class CommandManagementPanel extends JPanel {
             gbc.fill = GridBagConstraints.HORIZONTAL;
             int row = 0;
             addField(form, gbc, row++, MyMessageBundle.message("command.manager.col.name"), nameField, nameError);
-            addCommandField(form, gbc, row, MyMessageBundle.message("command.manager.col.command"), commandScroll, commandError);
+            addCommandField(form, gbc, row, MyMessageBundle.message("command.manager.dialog.command"), commandEditorPanel, commandError);
 
             JPanel buttons = new JPanel(new FlowLayout(FlowLayout.RIGHT));
             JButton saveBtn = new JButton(MyMessageBundle.message("command.manager.save"));
@@ -373,10 +410,10 @@ public final class CommandManagementPanel extends JPanel {
 
             if (existing != null) {
                 nameField.setText(existing.getName());
-                commandArea.setText(existing.getContent());
+                commandField.setText(existing.getContent());
             }
 
-            applyIdeaFont(nameField, commandArea);
+            applyIdeaFont(nameField, commandField);
             applyCompactSearchField(nameField);
 
             saveBtn.addActionListener(e -> saveCommand());
@@ -398,7 +435,7 @@ public final class CommandManagementPanel extends JPanel {
             }
             CommandTemplate command = existing == null ? new CommandTemplate() : existing;
             command.setName(nameField.getText().trim());
-            command.setContent(commandArea.getText().trim());
+            command.setContent(commandField.getText().trim());
             stateService.upsertCommand(command);
             saved = true;
             dispose();
@@ -407,7 +444,7 @@ public final class CommandManagementPanel extends JPanel {
         private boolean validateInputs() {
             boolean ok = true;
             String name = nameField.getText().trim();
-            String content = commandArea.getText().trim();
+            String content = commandField.getText().trim();
             if (name.isBlank()) {
                 nameError.setText(MyMessageBundle.message("command.manager.error.nameRequired"));
                 ok = false;

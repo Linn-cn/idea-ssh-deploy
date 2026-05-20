@@ -21,7 +21,7 @@ The scope is intentionally narrow: host management, upload, and command executio
 ## Features
 
 - [x] Add / edit / remove / search **SSH server** profiles (password or private key)
-- [x] **Command templates** — save snippets and reuse them in Run configurations (and in stored deploy profiles when imported)
+- [x] **Command templates** — multi-line snippets with `${fileName}` placeholder insertion; reuse in Run configurations (and in stored deploy profiles when imported)
 - [x] **File match rules** — built-in presets (read-only) plus your own name + regex rules; in **Run/Debug**, “Directory pattern” mode lists them under **Select regex** (use **Apply** to copy into the regex field)
 - [x] **Upload pipeline** — optional local build, SFTP upload, remote commands **before** and **after** upload, optional **Terminal** tab
 - [x] **Run/Debug configuration** — choose server, local artifact (file or directory + regex), remote path, before/after commands, optional one-line terminal command after success
@@ -41,7 +41,7 @@ The scope is intentionally narrow: host management, upload, and command executio
 
 1. Open **View → Tool Windows → SSH Deploy** (or the tool window button on the right).
 2. **Servers** — add hosts and credentials (IDE Password Safe supported).
-3. **Commands** — maintain reusable shell lines for Run configurations.
+3. **Commands** — maintain multi-line shell snippets for Run configurations (same editor as Run config, with **insert placeholder** for `${fileName}`).
 4. **File match rules** — optional: add named regex presets; built-in rows cannot be deleted. These populate **Select regex** in Run configuration when upload mode is **Directory pattern**.
 5. **Console** — stream log output from deploy actions that report here.
 

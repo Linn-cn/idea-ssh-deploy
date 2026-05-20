@@ -5,9 +5,11 @@ import com.sshdeploy.deploy.domain.BuiltinFileMatchRules;
 import com.sshdeploy.deploy.domain.CommandTemplate;
 import com.sshdeploy.deploy.domain.FileMatchRule;
 import com.sshdeploy.deploy.domain.ServerProfile;
+import com.sshdeploy.deploy.importer.ActWorkspaceXmlParser;
 import com.sshdeploy.deploy.storage.DeployPluginStateService;
-import com.intellij.icons.AllIcons;
-import com.intellij.openapi.editor.Editor;
+import com.sshdeploy.deploy.ui.common.ComboPreviewHtml;
+import com.sshdeploy.deploy.ui.common.CommandContentPreview;
+import com.sshdeploy.deploy.ui.common.CommandEditorSupport;
 import com.intellij.openapi.fileChooser.FileChooser;
 import com.intellij.openapi.fileChooser.FileChooserDescriptor;
 import com.intellij.openapi.fileChooser.FileChooserDescriptorFactory;
@@ -23,14 +25,15 @@ import com.intellij.ui.EditorTextField;
 import com.intellij.ui.components.JBScrollPane;
 import com.intellij.util.ui.JBUI;
 
+import javax.swing.DefaultListCellRenderer;
 import javax.swing.JButton;
 import javax.swing.JComboBox;
 import javax.swing.JComponent;
-import javax.swing.JList;
 import javax.swing.JLabel;
-import javax.swing.JOptionPane;
+import javax.swing.JList;
 import javax.swing.JPanel;
 import javax.swing.JTextField;
+import javax.swing.SwingConstants;
 import javax.swing.SwingUtilities;
 import javax.swing.UIManager;
 import javax.swing.text.JTextComponent;
@@ -48,6 +51,8 @@ import java.util.regex.PatternSyntaxException;
 public final class ServerDeploySettingsEditor extends SettingsEditor<ServerDeployRunConfiguration> {
     private static final String MODE_DIRECT = "DIRECT_FILE";
     private static final String MODE_REGEX = "DIR_REGEX";
+    private static final int COMMAND_COMBO_PREVIEW_LINES = 3;
+    private static final int REGEX_COMBO_PREVIEW_LINES = 2;
     private static final javax.swing.border.Border DEFAULT_BORDER = JBUI.Borders.customLine(JBColor.border(), 1);
     private static final javax.swing.border.Border ERROR_BORDER = JBUI.Borders.customLine(JBColor.RED, 1);
     private static final javax.swing.border.Border DEFAULT_PAD_SINGLE = paddedBorder(DEFAULT_BORDER, 0, 6, 0, 6);
@@ -101,13 +106,13 @@ public final class ServerDeploySettingsEditor extends SettingsEditor<ServerDeplo
         regexRuleCombo = new JComboBox<>();
         regexField = new JTextField();
 
-        preCommandsArea = createCommandEditorField(4);
+        preCommandsArea = CommandEditorSupport.createMultilineField(4);
         preCommandCombo = new JComboBox<>();
         preCommandAddBtn = new JButton(MyMessageBundle.message("runconfig.command.add"));
         regexRuleApplyBtn = new JButton(MyMessageBundle.message("runconfig.regex.apply"));
 
         remoteDirField = new JTextField();
-        postCommandsArea = createCommandEditorField(5);
+        postCommandsArea = CommandEditorSupport.createMultilineField(5);
         postCommandCombo = new JComboBox<>();
         postCommandAddBtn = new JButton(MyMessageBundle.message("runconfig.command.add"));
         terminalCommandCombo = new JComboBox<>();
@@ -121,6 +126,7 @@ public final class ServerDeploySettingsEditor extends SettingsEditor<ServerDeplo
 
         applyIdeaFont(uploadFileField, uploadDirectoryField, regexField, preCommandsArea, remoteDirField, postCommandsArea, terminalCommandField);
         applyInputPadding();
+        configureComboPreviewRenderers();
 
         JButton chooseFileBtn = new JButton(MyMessageBundle.message("runconfig.choose.file"));
         chooseFileBtn.addActionListener(e -> chooseFile(uploadFileField, false));
@@ -135,8 +141,8 @@ public final class ServerDeploySettingsEditor extends SettingsEditor<ServerDeplo
         JPanel preRow = commandRow(preCommandCombo, preCommandAddBtn);
         JPanel postRow = commandRow(postCommandCombo, postCommandAddBtn);
         JPanel terminalRow = commandRow(terminalCommandCombo, terminalCommandUseBtn);
-        JButton prePlaceholderBtn = createPlaceholderButton(() -> insertPlaceholderIntoArea(preCommandsArea));
-        JButton postPlaceholderBtn = createPlaceholderButton(() -> insertPlaceholderIntoArea(postCommandsArea));
+        JButton prePlaceholderBtn = CommandEditorSupport.createPlaceholderButton(panel, preCommandsArea);
+        JButton postPlaceholderBtn = CommandEditorSupport.createPlaceholderButton(panel, postCommandsArea);
 
         int row = 0;
         addRow(form, gbc, row++, MyMessageBundle.message("runconfig.editor.server.single"), serverCombo);
@@ -255,7 +261,13 @@ public final class ServerDeploySettingsEditor extends SettingsEditor<ServerDeplo
     private void refreshServersInternal() {
         serverCombo.removeAllItems();
         for (ServerProfile server : stateService.getServers()) {
-            serverCombo.addItem(new ServerItem(server.getId(), server.getName()));
+            serverCombo.addItem(new ServerItem(
+                    server.getId(),
+                    server.getName(),
+                    server.getHost(),
+                    server.getPort(),
+                    server.getUsername(),
+                    server.getDescription()));
         }
     }
 
@@ -586,78 +598,128 @@ public final class ServerDeploySettingsEditor extends SettingsEditor<ServerDeplo
         return new javax.swing.border.CompoundBorder(base, JBUI.Borders.empty(top, left, bottom, right));
     }
 
-    private static EditorTextField createCommandEditorField(int rows) {
-        EditorTextField field = new EditorTextField();
-        field.setOneLineMode(false);
-        int lineHeight = 22;
-        int height = Math.max(88, rows * lineHeight + 12);
-        java.awt.Dimension pref = field.getPreferredSize();
-        int minWidth = JBUI.scale(200);
-        field.setMinimumSize(new java.awt.Dimension(minWidth, height));
-        field.setPreferredSize(new java.awt.Dimension(Math.max(minWidth, pref.width), height));
-        field.setMaximumSize(new java.awt.Dimension(Integer.MAX_VALUE, height));
-        return field;
+    private void configureComboPreviewRenderers() {
+        int maxRows = 12;
+        serverCombo.setMaximumRowCount(maxRows);
+        regexRuleCombo.setMaximumRowCount(maxRows);
+        preCommandCombo.setMaximumRowCount(maxRows);
+        postCommandCombo.setMaximumRowCount(maxRows);
+        terminalCommandCombo.setMaximumRowCount(maxRows);
+
+        serverCombo.setRenderer(new DefaultListCellRenderer() {
+            @Override
+            public java.awt.Component getListCellRendererComponent(JList<?> list,
+                                                                   Object value,
+                                                                   int index,
+                                                                   boolean isSelected,
+                                                                   boolean cellHasFocus) {
+                JLabel label = (JLabel) super.getListCellRendererComponent(list, value, index, isSelected, cellHasFocus);
+                if (!(value instanceof ServerItem item)) {
+                    return label;
+                }
+                if (index < 0) {
+                    label.setText(item.name);
+                    label.setToolTipText(null);
+                    label.setVerticalAlignment(SwingConstants.CENTER);
+                } else {
+                    label.setText(ComboPreviewHtml.titledPreview(item.name, serverPreviewDetailHtml(item)));
+                    label.setVerticalAlignment(SwingConstants.TOP);
+                }
+                return label;
+            }
+        });
+
+        preCommandCombo.setRenderer(createCommandPreviewRenderer());
+        postCommandCombo.setRenderer(createCommandPreviewRenderer());
+        terminalCommandCombo.setRenderer(createCommandPreviewRenderer());
+
+        regexRuleCombo.setRenderer(new DefaultListCellRenderer() {
+            @Override
+            public java.awt.Component getListCellRendererComponent(JList<?> list,
+                                                                   Object value,
+                                                                   int index,
+                                                                   boolean isSelected,
+                                                                   boolean cellHasFocus) {
+                JLabel label = (JLabel) super.getListCellRendererComponent(list, value, index, isSelected, cellHasFocus);
+                if (!(value instanceof FileRegexRuleItem item)) {
+                    return label;
+                }
+                if (index < 0) {
+                    label.setText(item.label);
+                    label.setToolTipText(null);
+                    label.setVerticalAlignment(SwingConstants.CENTER);
+                } else {
+                    String detail = item.regex.isBlank()
+                            ? ""
+                            : CommandContentPreview.toHtmlBody(item.regex, REGEX_COMBO_PREVIEW_LINES);
+                    label.setText(ComboPreviewHtml.titledPreview(item.label, detail));
+                    label.setVerticalAlignment(SwingConstants.TOP);
+                }
+                return label;
+            }
+        });
     }
 
-    private JButton createPlaceholderButton(Runnable insertAction) {
-        JButton button = new JButton(AllIcons.Actions.ListFiles);
-        button.setToolTipText(MyMessageBundle.message("runconfig.placeholder.button.tooltip"));
-        button.addActionListener(e -> openPlaceholderDialog(insertAction));
-        return button;
+    private static String serverPreviewDetailHtml(ServerItem item) {
+        StringBuilder detail = new StringBuilder();
+        String connection = serverConnectionSummary(item);
+        if (!connection.isBlank()) {
+            detail.append(ComboPreviewHtml.escape(connection));
+        }
+        String description = previewableServerDescription(item.description);
+        if (!description.isBlank()) {
+            if (!detail.isEmpty()) {
+                detail.append("<br>");
+            }
+            detail.append(ComboPreviewHtml.escape(description));
+        }
+        return detail.toString();
     }
 
-    private void openPlaceholderDialog(Runnable insertAction) {
-        PlaceholderItem[] items = new PlaceholderItem[]{
-                new PlaceholderItem("${fileName}", MyMessageBundle.message("runconfig.placeholder.fileName.desc"))
+    private static String previewableServerDescription(String description) {
+        if (description == null || description.isBlank()) {
+            return "";
+        }
+        String trimmed = description.trim();
+        if (ActWorkspaceXmlParser.IMPORTED_SERVER_DESCRIPTION.equalsIgnoreCase(trimmed)) {
+            return "";
+        }
+        return trimmed;
+    }
+
+    private static String serverConnectionSummary(ServerItem item) {
+        if (item.host == null || item.host.isBlank()) {
+            return "";
+        }
+        String user = item.username == null ? "" : item.username.trim();
+        String prefix = user.isBlank() ? "" : user + "@";
+        return prefix + item.host.trim() + ":" + item.port;
+    }
+
+    private static DefaultListCellRenderer createCommandPreviewRenderer() {
+        return new DefaultListCellRenderer() {
+            @Override
+            public java.awt.Component getListCellRendererComponent(JList<?> list,
+                                                                   Object value,
+                                                                   int index,
+                                                                   boolean isSelected,
+                                                                   boolean cellHasFocus) {
+                JLabel label = (JLabel) super.getListCellRendererComponent(list, value, index, isSelected, cellHasFocus);
+                if (!(value instanceof CommandItem item)) {
+                    return label;
+                }
+                if (index < 0) {
+                    label.setText(item.name);
+                    label.setToolTipText(null);
+                    label.setVerticalAlignment(SwingConstants.CENTER);
+                } else {
+                    String detail = CommandContentPreview.toHtmlBody(item.content, COMMAND_COMBO_PREVIEW_LINES);
+                    label.setText(ComboPreviewHtml.titledPreview(item.name, detail));
+                    label.setVerticalAlignment(SwingConstants.TOP);
+                }
+                return label;
+            }
         };
-        JList<PlaceholderItem> list = new JList<>(items);
-        list.setSelectedIndex(0);
-        JBScrollPane scrollPane = new JBScrollPane(list);
-        scrollPane.setPreferredSize(new java.awt.Dimension(JBUI.scale(210), JBUI.scale(90)));
-        int result = JOptionPane.showConfirmDialog(
-                panel,
-                scrollPane,
-                MyMessageBundle.message("runconfig.placeholder.dialog.title"),
-                JOptionPane.OK_CANCEL_OPTION,
-                JOptionPane.PLAIN_MESSAGE
-        );
-        if (result == JOptionPane.OK_OPTION) {
-            PlaceholderItem selected = list.getSelectedValue();
-            if (selected != null) {
-                insertPlaceholder = selected.token;
-                insertAction.run();
-                insertPlaceholder = "";
-            }
-        }
-    }
-
-    private String insertPlaceholder = "";
-
-    private void insertPlaceholderIntoArea(EditorTextField area) {
-        if (insertPlaceholder == null || insertPlaceholder.isBlank()) {
-            return;
-        }
-        String content = area.getText();
-        int start = content.length();
-        int end = start;
-        Editor editor = area.getEditor();
-        if (editor != null) {
-            int selStart = editor.getSelectionModel().getSelectionStart();
-            int selEnd = editor.getSelectionModel().getSelectionEnd();
-            if (selStart >= 0 && selEnd >= selStart) {
-                start = selStart;
-                end = selEnd;
-            } else {
-                start = editor.getCaretModel().getOffset();
-                end = start;
-            }
-        }
-        String updated = content.substring(0, start) + insertPlaceholder + content.substring(end);
-        area.setText(updated);
-        Editor updatedEditor = area.getEditor();
-        if (updatedEditor != null) {
-            updatedEditor.getCaretModel().moveToOffset(start + insertPlaceholder.length());
-        }
     }
 
     private void replaceRegexField(String regex) {
@@ -704,10 +766,23 @@ public final class ServerDeploySettingsEditor extends SettingsEditor<ServerDeplo
     private static final class ServerItem {
         private final String id;
         private final String name;
+        private final String host;
+        private final int port;
+        private final String username;
+        private final String description;
 
-        private ServerItem(String id, String name) {
+        private ServerItem(String id,
+                           String name,
+                           String host,
+                           int port,
+                           String username,
+                           String description) {
             this.id = id;
             this.name = name;
+            this.host = host == null ? "" : host;
+            this.port = port;
+            this.username = username == null ? "" : username;
+            this.description = description == null ? "" : description;
         }
 
         @Override
@@ -733,18 +808,4 @@ public final class ServerDeploySettingsEditor extends SettingsEditor<ServerDeplo
         }
     }
 
-    private static final class PlaceholderItem {
-        private final String token;
-        private final String description;
-
-        private PlaceholderItem(String token, String description) {
-            this.token = token;
-            this.description = description;
-        }
-
-        @Override
-        public String toString() {
-            return token + " - " + description;
-        }
-    }
 }

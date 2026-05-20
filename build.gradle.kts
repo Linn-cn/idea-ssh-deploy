@@ -4,7 +4,7 @@ plugins {
 }
 
 group = "com.sshdeploy"
-version = "0.0.1"
+version = "0.0.2"
 
 java {
     toolchain {
@@ -43,6 +43,11 @@ intellijPlatform {
 
         // Patched into plugin.xml at build time — keep in sync with src/main/resources/META-INF/plugin.xml change-notes.
         changeNotes = """
+            <b>0.0.2</b><br/>
+            <ul>
+                <li>Command management add/edit: multi-line command editor with <code>${'$'}{fileName}</code> placeholder insertion (same as Run configuration)</li>
+                <li>Settings → SSH Deploy: clearer layout for JSON backup and ACT import sections</li>
+            </ul>
             <b>0.0.1</b><br/>
             <ul>
                 <li>SSH server profiles (password or private key), with credentials in IDE Password Safe</li>

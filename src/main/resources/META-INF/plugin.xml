@@ -27,7 +27,7 @@
     <ol>
         <li>Open the <b>SSH Deploy</b> tool window (right tool window bar, or <b>View → Tool Windows</b>).</li>
         <li>Under <b>Servers</b>, add SSH hosts. Credentials can use the IDE password safe.</li>
-        <li>Under <b>Commands</b>, add remote shell lines you reuse in Run configurations.</li>
+        <li>Under <b>Commands</b>, add multi-line remote shell snippets (with <code>${fileName}</code> placeholder insertion) for Run configurations.</li>
         <li>Under <b>File match rules</b>, optionally add named regex presets (built-in rows cannot be deleted).</li>
         <li>Use the <b>Console</b> tab for log output from operations that stream there.</li>
     </ol>
@@ -70,7 +70,7 @@
     <ol>
         <li>打开 <b>SSH Deploy</b> 工具窗口（右侧工具窗口条，或通过 <b>视图 → 工具窗口</b>）。</li>
         <li>在 <b>服务器</b> 中添加 SSH 主机；凭据可写入 IDE 密码保险箱。</li>
-        <li>在 <b>命令</b> 中维护可在运行配置中引用的远端 Shell 命令。</li>
+        <li>在 <b>命令</b> 中维护可在运行配置中引用的多行 Shell 片段（支持插入 <code>${fileName}</code> 占位符）。</li>
         <li>在 <b>文件匹配规则</b> 中按需维护名称与正则（内置行不可删除）。</li>
         <li>在 <b>控制台</b> 标签查看会输出到此处的日志。</li>
     </ol>
@@ -91,6 +91,11 @@
     ]]></description>
 
     <change-notes><![CDATA[
+    <b>0.0.2</b><br/>
+    <ul>
+        <li>Command management add/edit: multi-line command editor with <code>${fileName}</code> placeholder insertion (same as Run configuration)</li>
+        <li>Settings → SSH Deploy: clearer layout for JSON backup and ACT import sections</li>
+    </ul>
     <b>0.0.1</b> — Initial release.<br/>
     <ul>
         <li>SSH server profiles (password or private key), credentials via IDE Password Safe</li>

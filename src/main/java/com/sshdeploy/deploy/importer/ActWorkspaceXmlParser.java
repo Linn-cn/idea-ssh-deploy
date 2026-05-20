@@ -11,6 +11,9 @@ import java.util.*;
 
 public final class ActWorkspaceXmlParser implements ActConfigParser {
 
+    /** Stored on imported {@link ServerProfile#getDescription()}; hidden in Run configuration server combo preview. */
+    public static final String IMPORTED_SERVER_DESCRIPTION = "Imported from ACT";
+
     private static final String TYPE_DEPLOY = "DEPLOY_HOST_RUN_CONFIGURATION";
 
     @Override
@@ -116,7 +119,7 @@ public final class ActWorkspaceXmlParser implements ActConfigParser {
                 result.addWarning("Host " + address + " references ACT proxy (proxyId=" + proxyId + "); jump host is not supported and was ignored.");
             }
 
-            server.setDescription("Imported from ACT");
+            server.setDescription(IMPORTED_SERVER_DESCRIPTION);
 
             if (server.getAuthType() == AuthType.PASSWORD) {
                 result.putServerImportSecret(server.getId(), password != null ? password : "");
