@@ -18,8 +18,10 @@ import java.nio.file.Path;
 import java.nio.file.PathMatcher;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Properties;
+import java.util.Vector;
 import java.util.function.Consumer;
 
 import com.intellij.openapi.diagnostic.Logger;
@@ -31,6 +33,9 @@ public final class JschRemoteClient implements RemoteClient {
 
     private Session targetSession;
     private RemoteConnectRequest lastConnectRequest;
+    private final Object sessionLock = new Object();
+    private ChannelSftp listingSftp;
+    private String cachedHomeDirectory;
 
     @Override
     public void connect(RemoteConnectRequest request) throws Exception {
@@ -48,9 +53,15 @@ public final class JschRemoteClient implements RemoteClient {
         if (lastConnectRequest == null) {
             throw new IllegalStateException("SSH reconnect requested without prior connect().");
         }
-        close();
-        targetSession = createSession(lastConnectRequest.getTarget(), lastConnectRequest.getTargetCredentials());
-        targetSession.connect(CONNECT_TIMEOUT_MILLIS);
+        synchronized (sessionLock) {
+            closeListingSftp();
+            if (targetSession != null && targetSession.isConnected()) {
+                targetSession.disconnect();
+            }
+            targetSession = createSession(lastConnectRequest.getTarget(), lastConnectRequest.getTargetCredentials());
+            targetSession.connect(CONNECT_TIMEOUT_MILLIS);
+            cachedHomeDirectory = null;
+        }
     }
 
     @Override
@@ -155,6 +166,88 @@ public final class JschRemoteClient implements RemoteClient {
     }
 
     @Override
+    public List<RemoteDirectoryEntry> listDirectory(String remotePath) throws Exception {
+        Exception last = null;
+        for (int attempt = 1; attempt <= JschRetry.MAX_ATTEMPTS; attempt++) {
+            try {
+                return listDirectoryOnce(remotePath);
+            } catch (Exception e) {
+                last = e;
+                synchronized (sessionLock) {
+                    closeListingSftp();
+                }
+                if (attempt >= JschRetry.MAX_ATTEMPTS || !JschRetry.isTransient(e)) {
+                    throw e;
+                }
+                LOG.warn("SFTP list attempt " + attempt + "/" + JschRetry.MAX_ATTEMPTS + " failed, will retry: " + e.getMessage());
+                Thread.sleep(JschRetry.DELAY_MS);
+                reconnectSameHost();
+            }
+        }
+        if (last != null) {
+            throw last;
+        }
+        throw new IllegalStateException("listDirectory: no result");
+    }
+
+    private List<RemoteDirectoryEntry> listDirectoryOnce(String remotePath) throws Exception {
+        synchronized (sessionLock) {
+            ChannelSftp sftp = ensureListingSftp();
+            String home = resolveHomeDirectoryLocked(sftp);
+            String pathToList = RemotePathUtils.expandHome(remotePath, home);
+            @SuppressWarnings("unchecked")
+            Vector<ChannelSftp.LsEntry> entries = sftp.ls(pathToList);
+            List<RemoteDirectoryEntry> directories = new ArrayList<>();
+            for (ChannelSftp.LsEntry entry : entries) {
+                String name = entry.getFilename();
+                if (".".equals(name) || "..".equals(name)) {
+                    continue;
+                }
+                if (!entry.getAttrs().isDir()) {
+                    continue;
+                }
+                directories.add(new RemoteDirectoryEntry(name, RemotePathUtils.child(pathToList, name)));
+            }
+            directories.sort(Comparator.comparing(RemoteDirectoryEntry::getName, String.CASE_INSENSITIVE_ORDER));
+            return directories;
+        }
+    }
+
+    @Override
+    public String resolveHomeDirectory() throws Exception {
+        synchronized (sessionLock) {
+            return resolveHomeDirectoryLocked(ensureListingSftp());
+        }
+    }
+
+    private String resolveHomeDirectoryLocked(ChannelSftp sftp) throws Exception {
+        if (cachedHomeDirectory == null) {
+            cachedHomeDirectory = RemotePathUtils.normalize(sftp.getHome());
+        }
+        return cachedHomeDirectory;
+    }
+
+    private ChannelSftp ensureListingSftp() throws Exception {
+        if (listingSftp != null && listingSftp.isConnected()) {
+            return listingSftp;
+        }
+        listingSftp = openSftpChannel();
+        return listingSftp;
+    }
+
+    private void closeListingSftp() {
+        if (listingSftp != null) {
+            try {
+                listingSftp.disconnect();
+            } catch (Exception ignored) {
+                // ignore
+            }
+            listingSftp = null;
+        }
+        cachedHomeDirectory = null;
+    }
+
+    @Override
     public RemoteCommandResult execute(String command, int timeoutSeconds) throws Exception {
         return executeStreaming(command, timeoutSeconds, null, null);
     }
@@ -229,8 +322,11 @@ public final class JschRemoteClient implements RemoteClient {
 
     @Override
     public void close() {
-        if (targetSession != null && targetSession.isConnected()) {
-            targetSession.disconnect();
+        synchronized (sessionLock) {
+            closeListingSftp();
+            if (targetSession != null && targetSession.isConnected()) {
+                targetSession.disconnect();
+            }
         }
     }
 

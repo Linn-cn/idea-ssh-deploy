@@ -22,12 +22,17 @@ public final class DeployConsoleService {
         listeners.remove(listener);
     }
 
-    public void appendLine(String message) {
-        String line = "[" + LocalDateTime.now().format(FORMATTER) + "] " + message;
+    public String appendLine(String message) {
+        String line = formatTimestampedLine(message);
         logs.add(line);
         for (Consumer<String> listener : listeners) {
             listener.accept(line);
         }
+        return line;
+    }
+
+    public static String formatTimestampedLine(String message) {
+        return "[" + LocalDateTime.now().format(FORMATTER) + "] " + message;
     }
 
     public List<String> snapshot() {

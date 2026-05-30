@@ -6,7 +6,10 @@ import com.sshdeploy.deploy.domain.CommandTemplate;
 import com.sshdeploy.deploy.domain.FileMatchRule;
 import com.sshdeploy.deploy.domain.ServerProfile;
 import com.sshdeploy.deploy.importer.ActWorkspaceXmlParser;
+import com.sshdeploy.deploy.pipeline.CredentialResolver;
+import com.sshdeploy.deploy.remote.RemoteCredentials;
 import com.sshdeploy.deploy.storage.DeployPluginStateService;
+import com.sshdeploy.deploy.security.PasswordSafeCredentialStore;
 import com.sshdeploy.deploy.ui.common.ComboPreviewHtml;
 import com.sshdeploy.deploy.ui.common.CommandContentPreview;
 import com.sshdeploy.deploy.ui.common.CommandEditorSupport;
@@ -31,6 +34,7 @@ import javax.swing.JComboBox;
 import javax.swing.JComponent;
 import javax.swing.JLabel;
 import javax.swing.JList;
+import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JTextField;
 import javax.swing.SwingConstants;
@@ -45,6 +49,7 @@ import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
 import java.awt.Insets;
 import java.io.File;
+import java.util.Optional;
 import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
 
@@ -138,6 +143,8 @@ public final class ServerDeploySettingsEditor extends SettingsEditor<ServerDeplo
         regexRow2 = rowWithButton(MyMessageBundle.message("runconfig.editor.uploadRegexRuleSelect"), regexRuleCombo, regexRuleApplyBtn);
         regexRow4 = rowOnly(MyMessageBundle.message("runconfig.editor.uploadRegex"), regexField);
 
+        JButton chooseRemoteDirBtn = new JButton(MyMessageBundle.message("runconfig.choose.remoteDir"));
+        chooseRemoteDirBtn.addActionListener(e -> chooseRemoteDirectory());
         JPanel preRow = commandRow(preCommandCombo, preCommandAddBtn);
         JPanel postRow = commandRow(postCommandCombo, postCommandAddBtn);
         JPanel terminalRow = commandRow(terminalCommandCombo, terminalCommandUseBtn);
@@ -153,7 +160,8 @@ public final class ServerDeploySettingsEditor extends SettingsEditor<ServerDeplo
         addRow(form, gbc, row++, "", regexRow4);
         addRow(form, gbc, row++, MyMessageBundle.message("runconfig.editor.preCommands.select"), preRow);
         addRow(form, gbc, row++, MyMessageBundle.message("runconfig.editor.preCommands"), rowWithButton("", preCommandsArea, prePlaceholderBtn));
-        addRow(form, gbc, row++, MyMessageBundle.message("runconfig.editor.remoteDir"), remoteDirField);
+        addRow(form, gbc, row++, MyMessageBundle.message("runconfig.editor.remoteDir"),
+                rowWithButton("", remoteDirField, chooseRemoteDirBtn));
         addRow(form, gbc, row++, MyMessageBundle.message("runconfig.editor.postCommands.select"), postRow);
         addRow(form, gbc, row++, MyMessageBundle.message("runconfig.editor.postCommands"), rowWithButton("", postCommandsArea, postPlaceholderBtn));
         addRow(form, gbc, row++, MyMessageBundle.message("runconfig.editor.terminalCommand.select"), terminalRow);
@@ -486,6 +494,32 @@ public final class ServerDeploySettingsEditor extends SettingsEditor<ServerDeplo
         remoteDirField.setBorder(DEFAULT_PAD_SINGLE);
         preCommandsArea.setBorder(UIManager.getBorder("TextField.border"));
         postCommandsArea.setBorder(UIManager.getBorder("TextField.border"));
+    }
+
+    private void chooseRemoteDirectory() {
+        ServerItem selected = (ServerItem) serverCombo.getSelectedItem();
+        if (selected == null || selected.id.isBlank()) {
+            JOptionPane.showMessageDialog(
+                    panel,
+                    MyMessageBundle.message("runconfig.choose.remoteDir.serverRequired"),
+                    MyMessageBundle.message("runconfig.choose.remoteDir.title"),
+                    JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+        ServerProfile server = stateService.findServerById(selected.id).orElse(null);
+        if (server == null) {
+            JOptionPane.showMessageDialog(
+                    panel,
+                    MyMessageBundle.message("runconfig.error.server.notfound"),
+                    MyMessageBundle.message("runconfig.choose.remoteDir.title"),
+                    JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+        PasswordSafeCredentialStore credentialStore = new PasswordSafeCredentialStore();
+        RemoteCredentials credentials = new CredentialResolver().resolve(server, credentialStore);
+        Optional<String> chosen = RemoteDirectoryPickerDialog.choose(
+                panel, server, credentials, remoteDirField.getText());
+        chosen.ifPresent(remoteDirField::setText);
     }
 
     private void chooseFile(JTextComponent targetField, boolean directoryOnly) {

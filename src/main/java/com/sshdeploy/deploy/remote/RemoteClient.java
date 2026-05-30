@@ -27,6 +27,16 @@ public interface RemoteClient extends AutoCloseable {
 
     void uploadDirectory(File localDirectory, String remoteDirectory, List<String> filters) throws Exception;
 
+    /**
+     * Lists immediate child directories under {@code remotePath} (SFTP {@code ls}).
+     */
+    List<RemoteDirectoryEntry> listDirectory(String remotePath) throws Exception;
+
+    /**
+     * Returns the remote user's home directory (SFTP home).
+     */
+    String resolveHomeDirectory() throws Exception;
+
     RemoteCommandResult execute(String command, int timeoutSeconds) throws Exception;
 
     default RemoteCommandResult executeStreaming(String command,

@@ -29,6 +29,12 @@ public final class JschRetry {
                 if (m.contains("socket closed")) {
                     return true;
                 }
+                if (m.contains("connection is closed")) {
+                    return true;
+                }
+                if (m.contains("foreign host")) {
+                    return true;
+                }
                 if (m.contains("timeout") || m.contains("timed out")) {
                     return true;
                 }

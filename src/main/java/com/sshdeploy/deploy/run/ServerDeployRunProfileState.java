@@ -328,8 +328,8 @@ public final class ServerDeployRunProfileState implements RunProfileState {
         if (handler.isProcessTerminated()) {
             return;
         }
-        handler.notifyTextAvailable(message + System.lineSeparator(), ProcessOutputType.STDOUT);
-        consoleService.appendLine(message);
+        String line = consoleService.appendLine(message);
+        handler.notifyTextAvailable(line + System.lineSeparator(), ProcessOutputType.STDOUT);
     }
 
     private static void logProgressOverwrite(ProcessHandler handler, String message) {

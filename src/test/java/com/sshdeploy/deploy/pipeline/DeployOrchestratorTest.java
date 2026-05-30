@@ -167,6 +167,16 @@ public class DeployOrchestratorTest {
         }
 
         @Override
+        public List<com.sshdeploy.deploy.remote.RemoteDirectoryEntry> listDirectory(String remotePath) {
+            return List.of();
+        }
+
+        @Override
+        public String resolveHomeDirectory() {
+            return "/home/user";
+        }
+
+        @Override
         public RemoteCommandResult execute(String command, int timeoutSeconds) {
             executeCount++;
             return new RemoteCommandResult(0, "ok", "");

@@ -4,7 +4,7 @@ plugins {
 }
 
 group = "com.sshdeploy"
-version = "0.0.2"
+version = "0.0.3"
 
 java {
     toolchain {
@@ -43,6 +43,14 @@ intellijPlatform {
 
         // Patched into plugin.xml at build time — keep in sync with src/main/resources/META-INF/plugin.xml change-notes.
         changeNotes = """
+            <b>0.0.3</b><br/>
+            <ul>
+                <li>Run configuration: browse remote upload directory on the selected SSH server (SFTP)</li>
+                <li>Run configuration: preview server, command, and regex presets in dropdown lists</li>
+                <li>Command management: multi-line preview in the command list (up to 5 lines)</li>
+                <li>Run tool window logs now include timestamps like the tool-window Console tab</li>
+                <li>Remote upload directory browser: default start at <code>/</code>, reuse SFTP session, retry on transient disconnects</li>
+            </ul>
             <b>0.0.2</b><br/>
             <ul>
                 <li>Command management add/edit: multi-line command editor with <code>${'$'}{fileName}</code> placeholder insertion (same as Run configuration)</li>
