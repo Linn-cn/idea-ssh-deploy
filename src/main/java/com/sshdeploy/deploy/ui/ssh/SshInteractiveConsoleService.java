@@ -2,9 +2,11 @@ package com.sshdeploy.deploy.ui.ssh;
 
 import com.sshdeploy.deploy.domain.AuthType;
 import com.sshdeploy.deploy.domain.ServerProfile;
+import com.sshdeploy.deploy.remote.JschSessionTuning;
 import com.sshdeploy.deploy.remote.JschSftpChannels;
 import com.sshdeploy.deploy.remote.RemoteCredentials;
 import com.sshdeploy.deploy.remote.RemoteShellCommand;
+import com.sshdeploy.deploy.remote.UploadProgressSteps;
 import com.intellij.openapi.components.Service;
 import com.intellij.openapi.Disposable;
 import com.jcraft.jsch.ChannelExec;
@@ -105,7 +107,7 @@ public final class SshInteractiveConsoleService implements Disposable {
 
         Session s = jsch.getSession(profile.getUsername(), host, port);
         Properties config = new Properties();
-        config.put("StrictHostKeyChecking", "no");
+        JschSessionTuning.apply(config);
         s.setConfig(config);
         s.setServerAliveInterval(5_000);
 
@@ -170,8 +172,6 @@ public final class SshInteractiveConsoleService implements Disposable {
             String remoteFile = remoteDir.endsWith("/") ? remoteDir + localFile.getName() : remoteDir + "/" + localFile.getName();
 
             int[] last = new int[]{-1};
-            // JSch's SftpProgressMonitor doesn't guarantee stable 'total' semantics.
-            // We still aim for 1% granularity by logging when percent increases.
             SftpProgressMonitor monitor2 = new SftpProgressMonitor() {
                 private long transferred;
                 private long total;
@@ -180,7 +180,8 @@ public final class SshInteractiveConsoleService implements Disposable {
                 public void init(int op, String src, String dest, long max) {
                     transferred = 0;
                     total = max;
-                    if (uploadProgressCallback != null) {
+                    last[0] = -1;
+                    if (uploadProgressCallback != null && UploadProgressSteps.shouldReport(last, 0)) {
                         uploadProgressCallback.accept(0);
                     }
                 }
@@ -190,18 +191,15 @@ public final class SshInteractiveConsoleService implements Disposable {
                     transferred += count;
                     long t = total <= 0 ? transferred : total;
                     int percent = (int) Math.min(100, (transferred * 100L) / t);
-                    if (percent > last[0]) {
-                        last[0] = percent;
-                        if (uploadProgressCallback != null) {
-                            uploadProgressCallback.accept(percent);
-                        }
+                    if (UploadProgressSteps.shouldReport(last, percent) && uploadProgressCallback != null) {
+                        uploadProgressCallback.accept(percent);
                     }
                     return true;
                 }
 
                 @Override
                 public void end() {
-                    if (uploadProgressCallback != null) {
+                    if (uploadProgressCallback != null && UploadProgressSteps.shouldReport(last, 100)) {
                         uploadProgressCallback.accept(100);
                     }
                 }

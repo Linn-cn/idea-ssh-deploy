@@ -532,8 +532,8 @@ public final class ServerDeploySettingsEditor extends SettingsEditor<ServerDeplo
 
     private File chooseByIntelliJFileChooser(boolean directoryOnly) {
         FileChooserDescriptor descriptor = directoryOnly
-                ? FileChooserDescriptorFactory.createSingleFolderDescriptor()
-                : FileChooserDescriptorFactory.createSingleLocalFileDescriptor();
+                ? FileChooserDescriptorFactory.singleDir()
+                : FileChooserDescriptorFactory.singleFile();
         descriptor.setTitle(directoryOnly
                 ? MyMessageBundle.message("runconfig.choose.dir")
                 : MyMessageBundle.message("runconfig.choose.file"));

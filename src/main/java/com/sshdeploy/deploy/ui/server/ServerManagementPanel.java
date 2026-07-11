@@ -1,6 +1,7 @@
 package com.sshdeploy.deploy.ui.server;
 
 import com.sshdeploy.MyMessageBundle;
+import com.sshdeploy.deploy.backup.ConfigSection;
 import com.sshdeploy.deploy.domain.AuthType;
 import com.sshdeploy.deploy.domain.ServerProfile;
 import com.sshdeploy.deploy.pipeline.CredentialResolver;
@@ -11,6 +12,7 @@ import com.sshdeploy.deploy.remote.RemoteCredentials;
 import com.sshdeploy.deploy.security.CredentialRefManager;
 import com.sshdeploy.deploy.security.CredentialStore;
 import com.sshdeploy.deploy.storage.DeployPluginStateService;
+import com.sshdeploy.deploy.ui.common.ConfigSectionIoSupport;
 import com.sshdeploy.deploy.ui.common.MasterCheckboxColumnHeaderSupport;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.ui.Messages;
@@ -128,6 +130,8 @@ public final class ServerManagementPanel extends JPanel {
         JButton searchButton = new JButton(MyMessageBundle.message("server.manager.searchBtn"));
         JButton resetButton = new JButton(MyMessageBundle.message("server.manager.search.reset"));
         JButton addButton = new JButton(MyMessageBundle.message("server.manager.add"));
+        JButton exportButton = new JButton(MyMessageBundle.message("server.manager.export"));
+        JButton importButton = new JButton(MyMessageBundle.message("server.manager.import"));
         topPanel.add(searchButton, gbc);
         gbc.gridx = 6;
         topPanel.add(resetButton, gbc);
@@ -136,6 +140,10 @@ public final class ServerManagementPanel extends JPanel {
         gbc.gridx = 8;
         JButton batchDeleteButton = new JButton(MyMessageBundle.message("server.manager.batchDelete"));
         topPanel.add(batchDeleteButton, gbc);
+        gbc.gridx = 9;
+        topPanel.add(exportButton, gbc);
+        gbc.gridx = 10;
+        topPanel.add(importButton, gbc);
         add(topPanel, BorderLayout.NORTH);
         add(new JBScrollPane(table), BorderLayout.CENTER);
         setBorder(javax.swing.BorderFactory.createEmptyBorder(6, 8, 6, 8));
@@ -155,6 +163,10 @@ public final class ServerManagementPanel extends JPanel {
         });
         addButton.addActionListener(e -> openEditDialog(null));
         batchDeleteButton.addActionListener(e -> batchDeleteSelectedServers());
+        exportButton.addActionListener(e ->
+                ConfigSectionIoSupport.exportSection(this, ConfigSection.SERVERS, stateService, credentialStore));
+        importButton.addActionListener(e ->
+                ConfigSectionIoSupport.importSection(this, ConfigSection.SERVERS, stateService, credentialStore, this::refreshTable));
         refreshTable();
     }
 

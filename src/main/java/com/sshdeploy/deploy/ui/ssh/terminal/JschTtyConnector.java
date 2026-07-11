@@ -5,18 +5,19 @@ import com.sshdeploy.deploy.domain.ServerProfile;
 import com.sshdeploy.deploy.remote.RemoteCredentials;
 import com.jcraft.jsch.ChannelShell;
 import com.jcraft.jsch.ChannelSftp;
+import com.sshdeploy.deploy.remote.JschSessionTuning;
 import com.sshdeploy.deploy.remote.JschSftpChannels;
+import com.sshdeploy.deploy.remote.UploadProgressSteps;
 import com.jcraft.jsch.JSch;
 import com.jcraft.jsch.SftpException;
 import com.jcraft.jsch.SftpProgressMonitor;
 import com.jcraft.jsch.Session;
-import com.jediterm.terminal.Questioner;
+import com.jediterm.core.util.TermSize;
 import com.jediterm.terminal.TtyConnector;
 import com.intellij.openapi.diagnostic.Logger;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import java.awt.Dimension;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
@@ -48,8 +49,7 @@ public final class JschTtyConnector implements TtyConnector {
     private Integer waitingExitCode;
     private StringBuilder markerBuffer = new StringBuilder();
 
-    private Dimension pendingTermSize;
-    private Dimension pendingPixelSize;
+    private TermSize pendingTermSize;
     private String name = "SSH Deploy";
     private volatile String initErrorMessage;
 
@@ -69,8 +69,11 @@ public final class JschTtyConnector implements TtyConnector {
         return outputStream;
     }
 
-    @Override
-    public boolean init(Questioner questioner) {
+    /**
+     * Establishes the SSH shell session. Call before handing streams to the IDE terminal.
+     * Prefer this over the deprecated {@link TtyConnector#init} API.
+     */
+    public boolean connect() {
         if (initiated.get()) {
             return isConnected();
         }
@@ -208,24 +211,22 @@ public final class JschTtyConnector implements TtyConnector {
     }
 
     @Override
-    public void resize(@NotNull Dimension termSize, @NotNull Dimension pixelSize) {
+    public void resize(@NotNull TermSize termSize) {
         pendingTermSize = termSize;
-        pendingPixelSize = pixelSize;
         resizeImmediately();
     }
 
     private void resizeImmediately() {
-        if (shell == null || pendingTermSize == null || pendingPixelSize == null) {
+        if (shell == null || pendingTermSize == null) {
             return;
         }
         shell.setPtySize(
-                pendingTermSize.width,
-                pendingTermSize.height,
-                pendingPixelSize.width,
-                pendingPixelSize.height
+                pendingTermSize.getColumns(),
+                pendingTermSize.getRows(),
+                0,
+                0
         );
         pendingTermSize = null;
-        pendingPixelSize = null;
     }
 
     private static Session createSession(JSch jsch,
@@ -246,7 +247,7 @@ public final class JschTtyConnector implements TtyConnector {
 
         Session session = jsch.getSession(profile.getUsername(), host, port);
         Properties config = new Properties();
-        config.put("StrictHostKeyChecking", "no");
+        JschSessionTuning.apply(config);
         session.setConfig(config);
         if (profile.getAuthType() == AuthType.PASSWORD) {
             if (credentials == null || credentials.getPassword() == null || credentials.getPassword().isBlank()) {
@@ -333,8 +334,7 @@ public final class JschTtyConnector implements TtyConnector {
                     transferred += count;
                     long t = total <= 0 ? transferred : total;
                     int percent = (int) Math.min(100, (transferred * 100L) / t);
-                    if (percent > last[0]) {
-                        last[0] = percent;
+                    if (UploadProgressSteps.shouldReport(last, percent)) {
                         if (progress != null) progress.accept(percent);
                     }
                     return true;
@@ -342,7 +342,7 @@ public final class JschTtyConnector implements TtyConnector {
 
                 @Override
                 public void end() {
-                    if (progress != null && last[0] < 100) {
+                    if (progress != null && UploadProgressSteps.shouldReport(last, 100)) {
                         progress.accept(100);
                     }
                 }

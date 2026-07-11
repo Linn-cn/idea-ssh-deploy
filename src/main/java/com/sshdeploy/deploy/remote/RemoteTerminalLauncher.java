@@ -3,11 +3,10 @@ package com.sshdeploy.deploy.remote;
 import com.sshdeploy.MyMessageBundle;
 import com.sshdeploy.deploy.domain.ServerProfile;
 import com.intellij.openapi.project.Project;
-import org.jetbrains.plugins.terminal.ShellTerminalWidget;
+import com.intellij.terminal.ui.TerminalWidget;
 import org.jetbrains.plugins.terminal.TerminalToolWindowManager;
 
 import java.io.File;
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -44,12 +43,14 @@ public final class RemoteTerminalLauncher {
     private void executeInTerminal(Project project, String targetName, String command) {
         TerminalToolWindowManager terminalManager = TerminalToolWindowManager.getInstance(project);
         try {
-            ShellTerminalWidget widget = terminalManager.createLocalShellWidget(
+            TerminalWidget widget = terminalManager.createShellWidget(
                     project.getBasePath(),
-                    MyMessageBundle.message("terminal.tab.ssh", targetName)
+                    MyMessageBundle.message("terminal.tab.ssh", targetName),
+                    true,
+                    true
             );
-            widget.executeCommand(command);
-        } catch (IOException e) {
+            widget.sendCommandToExecute(command);
+        } catch (Exception e) {
             throw new RuntimeException(MyMessageBundle.message("terminal.error.open", e.getMessage()), e);
         }
     }

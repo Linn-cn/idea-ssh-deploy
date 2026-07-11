@@ -4,7 +4,7 @@ plugins {
 }
 
 group = "com.sshdeploy"
-version = "0.0.3"
+version = "0.0.4"
 
 java {
     toolchain {
@@ -27,7 +27,12 @@ dependencies {
     testImplementation("junit:junit:4.13.2")
 
     intellijPlatform {
-        intellijIdea(providers.gradleProperty("platformVersion"))
+        val localIdePath = providers.gradleProperty("localIdePath")
+        if (localIdePath.isPresent) {
+            local(localIdePath)
+        } else {
+            intellijIdea(providers.gradleProperty("platformVersion"))
+        }
         testFramework(org.jetbrains.intellij.platform.gradle.TestFrameworkType.Platform)
 
         bundledPlugin("com.intellij.java")
@@ -43,6 +48,14 @@ intellijPlatform {
 
         // Patched into plugin.xml at build time — keep in sync with src/main/resources/META-INF/plugin.xml change-notes.
         changeNotes = """
+            <b>0.0.4</b><br/>
+            <ul>
+                <li>Tool window: per-section JSON export/import for Servers, Commands, and File match rules (also accepts a full backup and reads only that section)</li>
+                <li>Remote commands: on failure, automatically retry up to 2 more times (3 attempts total) with reconnect; progress shown in Run logs</li>
+                <li>Migrate off Terminal / JediTerm / FileChooser / SAXBuilder APIs scheduled for removal or deprecated</li>
+                <li>Upload: prefer faster SSH ciphers (AES-GCM / ChaCha20 first)</li>
+                <li>Upload: refresh progress every 2% instead of every 1%</li>
+            </ul>
             <b>0.0.3</b><br/>
             <ul>
                 <li>Run configuration: browse remote upload directory on the selected SSH server (SFTP)</li>

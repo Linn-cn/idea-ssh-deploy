@@ -28,6 +28,8 @@ The scope is intentionally narrow: host management, upload, and command executio
 - [x] Placeholder **`${fileName}`** in remote commands for the uploaded artifact name (e.g. versioned JAR)
 - [x] Import **Alibaba Cloud Toolkit (ACT)**-style XML for faster migration
 - [x] **English** and **Simplified Chinese** UI (follow IDE language or override in Settings)
+- [x] **Configuration backup** — full JSON from **Settings → SSH Deploy**; per-section **Export… / Import…** on Servers, Commands, and File match rules in the tool window (section import can also take a full backup and apply only that section; merge + skip duplicates)
+- [x] **Remote command retry** — before/after remote commands retry up to 2 more times on any failure (3 attempts total) with SSH reconnect
 - [x] **Connection test**, **dry run**, and console logging for deploy stages
 
 ## Requirements
@@ -40,17 +42,21 @@ The scope is intentionally narrow: host management, upload, and command executio
 **Tool window** (nested tabs inside **SSH Deploy**)
 
 1. Open **View → Tool Windows → SSH Deploy** (or the tool window button on the right).
-2. **Servers** — add hosts and credentials (IDE Password Safe supported).
-3. **Commands** — maintain multi-line shell snippets for Run configurations (same editor as Run config, with **insert placeholder** for `${fileName}`).
-4. **File match rules** — optional: add named regex presets; built-in rows cannot be deleted. These populate **Select regex** in Run configuration when upload mode is **Directory pattern**.
+2. **Servers** — add hosts and credentials (IDE Password Safe supported). Use **Export… / Import…** for servers-only JSON, or import servers from a full backup file.
+3. **Commands** — maintain multi-line shell snippets for Run configurations (same editor as Run config, with **insert placeholder** for `${fileName}`). Use **Export… / Import…** for commands-only JSON.
+4. **File match rules** — optional: add named regex presets; built-in rows cannot be deleted. These populate **Select regex** in Run configuration when upload mode is **Directory pattern**. Use **Export… / Import…** for user rules only.
 5. **Console** — stream log output from deploy actions that report here.
+
+**Settings**
+
+- **Settings → Tools → SSH Deploy** — language / defaults, **full** JSON configuration backup, and ACT XML import.
 
 **Run/Debug**
 
 1. **Run → Edit Configurations → + → SSH Deploy**
 2. Pick server, local upload source (direct file or directory + file match regex), remote directory, and optional commands / terminal line.
 3. In **Directory pattern** mode, choose a preset under **Select regex** and click **Apply** to fill the regex field (you can still edit the text).
-4. Run; logs appear in the **Run** tool window.
+4. Run; logs appear in the **Run** tool window. If a remote command fails, the plugin retries automatically (up to 3 attempts) and logs each retry.
 
 ## Development
 

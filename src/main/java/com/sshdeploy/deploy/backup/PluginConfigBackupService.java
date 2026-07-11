@@ -39,8 +39,98 @@ public final class PluginConfigBackupService {
 
     public static @NotNull String exportToJson(@NotNull DeployPluginStateService stateService,
                                                @NotNull CredentialStore credentialStore) {
+        PluginConfigSnapshot snap = newEmptySnapshot();
+        fillServers(snap, stateService, credentialStore);
+        fillCommands(snap, stateService);
+        fillFileMatchRules(snap, stateService);
+        return GSON.toJson(snap);
+    }
+
+    /**
+     * Exports only the given section; other lists in the snapshot are empty.
+     */
+    public static @NotNull String exportSectionToJson(@NotNull ConfigSection section,
+                                                      @NotNull DeployPluginStateService stateService,
+                                                      @NotNull CredentialStore credentialStore) {
+        PluginConfigSnapshot snap = newEmptySnapshot();
+        switch (section) {
+            case SERVERS -> fillServers(snap, stateService, credentialStore);
+            case COMMANDS -> fillCommands(snap, stateService);
+            case FILE_MATCH_RULES -> fillFileMatchRules(snap, stateService);
+        }
+        return GSON.toJson(snap);
+    }
+
+    public static @NotNull ImportResult importFromJson(@NotNull String json,
+                                                       @NotNull DeployPluginStateService stateService,
+                                                       @NotNull CredentialStore credentialStore) throws JsonSyntaxException {
+        PluginConfigSnapshot snap = parseSnapshot(json);
+        int sa = 0, ss = 0, ca = 0, cs = 0, ra = 0, rs = 0;
+        int[] serverCounts = mergeServers(snap.servers, stateService, credentialStore);
+        sa = serverCounts[0];
+        ss = serverCounts[1];
+        int[] commandCounts = mergeCommands(snap.commands, stateService);
+        ca = commandCounts[0];
+        cs = commandCounts[1];
+        int[] ruleCounts = mergeFileMatchRules(snap.fileMatchRules, stateService);
+        ra = ruleCounts[0];
+        rs = ruleCounts[1];
+        return new ImportResult(sa, ss, ca, cs, ra, rs);
+    }
+
+    /**
+     * Imports only the given section from JSON. Other sections in a full backup are ignored.
+     */
+    public static @NotNull ImportResult importSectionFromJson(@NotNull ConfigSection section,
+                                                              @NotNull String json,
+                                                              @NotNull DeployPluginStateService stateService,
+                                                              @NotNull CredentialStore credentialStore) throws JsonSyntaxException {
+        PluginConfigSnapshot snap = parseSnapshot(json);
+        return switch (section) {
+            case SERVERS -> {
+                int[] c = mergeServers(snap.servers, stateService, credentialStore);
+                yield new ImportResult(c[0], c[1], 0, 0, 0, 0);
+            }
+            case COMMANDS -> {
+                int[] c = mergeCommands(snap.commands, stateService);
+                yield new ImportResult(0, 0, c[0], c[1], 0, 0);
+            }
+            case FILE_MATCH_RULES -> {
+                int[] c = mergeFileMatchRules(snap.fileMatchRules, stateService);
+                yield new ImportResult(0, 0, 0, 0, c[0], c[1]);
+            }
+        };
+    }
+
+    private static @NotNull PluginConfigSnapshot newEmptySnapshot() {
         PluginConfigSnapshot snap = new PluginConfigSnapshot();
         snap.exportedAt = Instant.now().toString();
+        return snap;
+    }
+
+    private static @NotNull PluginConfigSnapshot parseSnapshot(@NotNull String json) throws JsonSyntaxException {
+        PluginConfigSnapshot snap = GSON.fromJson(json, PluginConfigSnapshot.class);
+        if (snap == null) {
+            throw new JsonSyntaxException("empty document");
+        }
+        if (snap.formatVersion < 1) {
+            throw new JsonSyntaxException("unsupported formatVersion");
+        }
+        if (snap.servers == null) {
+            snap.servers = new ArrayList<>();
+        }
+        if (snap.commands == null) {
+            snap.commands = new ArrayList<>();
+        }
+        if (snap.fileMatchRules == null) {
+            snap.fileMatchRules = new ArrayList<>();
+        }
+        return snap;
+    }
+
+    private static void fillServers(@NotNull PluginConfigSnapshot snap,
+                                    @NotNull DeployPluginStateService stateService,
+                                    @NotNull CredentialStore credentialStore) {
         for (ServerProfile s : stateService.getServers()) {
             PluginConfigSnapshot.ServerBackupRow row = new PluginConfigSnapshot.ServerBackupRow();
             row.name = nullToEmpty(s.getName());
@@ -58,6 +148,10 @@ public final class PluginConfigBackupService {
             }
             snap.servers.add(row);
         }
+    }
+
+    private static void fillCommands(@NotNull PluginConfigSnapshot snap,
+                                     @NotNull DeployPluginStateService stateService) {
         for (CommandTemplate c : stateService.getCommands()) {
             PluginConfigSnapshot.CommandBackupRow row = new PluginConfigSnapshot.CommandBackupRow();
             row.name = nullToEmpty(c.getName());
@@ -67,6 +161,10 @@ public final class PluginConfigBackupService {
             row.executionType = c.getExecutionType() == null ? CommandExecutionType.AFTER.name() : c.getExecutionType().name();
             snap.commands.add(row);
         }
+    }
+
+    private static void fillFileMatchRules(@NotNull PluginConfigSnapshot snap,
+                                           @NotNull DeployPluginStateService stateService) {
         for (FileMatchRule r : stateService.getUserFileMatchRules()) {
             if (BuiltinFileMatchRules.isBuiltinId(r.getId())) {
                 continue;
@@ -76,41 +174,24 @@ public final class PluginConfigBackupService {
             row.pattern = nullToEmpty(r.getPattern());
             snap.fileMatchRules.add(row);
         }
-        return GSON.toJson(snap);
     }
 
-    public static @NotNull ImportResult importFromJson(@NotNull String json,
-                                                       @NotNull DeployPluginStateService stateService,
-                                                       @NotNull CredentialStore credentialStore) throws JsonSyntaxException {
-        PluginConfigSnapshot snap = GSON.fromJson(json, PluginConfigSnapshot.class);
-        if (snap == null) {
-            throw new JsonSyntaxException("empty document");
-        }
-        if (snap.formatVersion < 1) {
-            throw new JsonSyntaxException("unsupported formatVersion");
-        }
-        if (snap.servers == null) {
-            snap.servers = new ArrayList<>();
-        }
-        if (snap.commands == null) {
-            snap.commands = new ArrayList<>();
-        }
-        if (snap.fileMatchRules == null) {
-            snap.fileMatchRules = new ArrayList<>();
-        }
-
-        int sa = 0, ss = 0, ca = 0, cs = 0, ra = 0, rs = 0;
-
-        for (PluginConfigSnapshot.ServerBackupRow row : snap.servers) {
+    /** @return {@code [added, skipped]} */
+    private static int @NotNull [] mergeServers(@NotNull List<PluginConfigSnapshot.ServerBackupRow> rows,
+                                                @NotNull DeployPluginStateService stateService,
+                                                @NotNull CredentialStore credentialStore) {
+        int added = 0;
+        int skipped = 0;
+        for (PluginConfigSnapshot.ServerBackupRow row : rows) {
             if (row == null) {
                 continue;
             }
             if (isBlank(row.name) || isBlank(row.host)) {
-                ss++;
+                skipped++;
                 continue;
             }
             if (serverDuplicate(stateService, row.name, row.host, row.port, row.username)) {
-                ss++;
+                skipped++;
                 continue;
             }
             ServerProfile profile = new ServerProfile();
@@ -129,21 +210,28 @@ public final class PluginConfigBackupService {
             if (!secret.isBlank()) {
                 credentialStore.savePassword(profile.getCredentialRef(), profile.getUsername(), secret);
             }
-            sa++;
+            added++;
         }
+        return new int[]{added, skipped};
+    }
 
-        for (PluginConfigSnapshot.CommandBackupRow row : snap.commands) {
+    /** @return {@code [added, skipped]} */
+    private static int @NotNull [] mergeCommands(@NotNull List<PluginConfigSnapshot.CommandBackupRow> rows,
+                                                 @NotNull DeployPluginStateService stateService) {
+        int added = 0;
+        int skipped = 0;
+        for (PluginConfigSnapshot.CommandBackupRow row : rows) {
             if (row == null) {
                 continue;
             }
             String name = row.name == null ? "" : row.name.trim();
             String content = row.content == null ? "" : row.content.trim();
             if (name.isBlank() || content.isBlank()) {
-                cs++;
+                skipped++;
                 continue;
             }
             if (commandNameExists(stateService, name)) {
-                cs++;
+                skipped++;
                 continue;
             }
             CommandTemplate cmd = new CommandTemplate();
@@ -154,21 +242,28 @@ public final class PluginConfigBackupService {
             cmd.setFailFast(row.failFast);
             cmd.setExecutionType(parseExecutionType(row.executionType));
             stateService.upsertCommand(cmd);
-            ca++;
+            added++;
         }
+        return new int[]{added, skipped};
+    }
 
-        for (PluginConfigSnapshot.FileRuleBackupRow row : snap.fileMatchRules) {
+    /** @return {@code [added, skipped]} */
+    private static int @NotNull [] mergeFileMatchRules(@NotNull List<PluginConfigSnapshot.FileRuleBackupRow> rows,
+                                                       @NotNull DeployPluginStateService stateService) {
+        int added = 0;
+        int skipped = 0;
+        for (PluginConfigSnapshot.FileRuleBackupRow row : rows) {
             if (row == null) {
                 continue;
             }
             String name = row.name == null ? "" : row.name.trim();
             String pattern = row.pattern == null ? "" : row.pattern.trim();
             if (name.isBlank() || pattern.isBlank()) {
-                rs++;
+                skipped++;
                 continue;
             }
             if (fileRuleNameExists(stateService, name)) {
-                rs++;
+                skipped++;
                 continue;
             }
             FileMatchRule rule = new FileMatchRule();
@@ -176,10 +271,9 @@ public final class PluginConfigBackupService {
             rule.setName(name);
             rule.setPattern(pattern);
             stateService.upsertUserFileMatchRule(rule);
-            ra++;
+            added++;
         }
-
-        return new ImportResult(sa, ss, ca, cs, ra, rs);
+        return new int[]{added, skipped};
     }
 
     private static boolean serverDuplicate(DeployPluginStateService state,

@@ -1,9 +1,8 @@
 package com.sshdeploy.deploy.importer;
 
 import com.sshdeploy.deploy.domain.*;
-import org.jdom.Document;
+import com.intellij.openapi.util.JDOMUtil;
 import org.jdom.Element;
-import org.jdom.input.SAXBuilder;
 
 import java.io.ByteArrayInputStream;
 import java.nio.charset.StandardCharsets;
@@ -30,9 +29,7 @@ public final class ActWorkspaceXmlParser implements ActConfigParser {
     public ImportResult parse(String content) {
         ImportResult result = new ImportResult();
         try {
-            SAXBuilder saxBuilder = new SAXBuilder();
-            Document doc = saxBuilder.build(new ByteArrayInputStream(content.getBytes(StandardCharsets.UTF_8)));
-            Element root = doc.getRootElement();
+            Element root = JDOMUtil.load(new ByteArrayInputStream(content.getBytes(StandardCharsets.UTF_8)));
 
             Map<String, String> profileIdToCredentials = parseProfiles(root.getChild("database"), result);
             Map<String, String> hostIdToServerId = parseHosts(root.getChild("database"), profileIdToCredentials, result);
@@ -216,8 +213,7 @@ public final class ActWorkspaceXmlParser implements ActConfigParser {
         }
 
         try {
-            SAXBuilder saxBuilder = new SAXBuilder();
-            Element configRoot = saxBuilder.build(new ByteArrayInputStream(runConfigCData.getBytes(StandardCharsets.UTF_8))).getRootElement();
+            Element configRoot = JDOMUtil.load(new ByteArrayInputStream(runConfigCData.getBytes(StandardCharsets.UTF_8)));
 
             for (Element configElem : configRoot.getChildren("configuration")) {
                 String type = configElem.getAttributeValue("type", "");

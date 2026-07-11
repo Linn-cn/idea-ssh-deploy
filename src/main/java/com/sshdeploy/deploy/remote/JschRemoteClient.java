@@ -25,6 +25,7 @@ import java.util.Vector;
 import java.util.function.Consumer;
 
 import com.intellij.openapi.diagnostic.Logger;
+import org.jetbrains.annotations.Nullable;
 
 public final class JschRemoteClient implements RemoteClient {
     private static final Logger LOG = Logger.getInstance(JschRemoteClient.class);
@@ -105,24 +106,36 @@ public final class JschRemoteClient implements RemoteClient {
                 monitor = new SftpProgressMonitor() {
                     private long transferred;
                     private long total;
+                    private final int[] lastReportedPercent = new int[]{-1};
 
                     @Override
                     public void init(int op, String src, String dest, long max) {
                         this.transferred = 0;
                         this.total = max;
-                        listener.onProgress(0, max);
+                        lastReportedPercent[0] = -1;
+                        if (UploadProgressSteps.shouldReport(lastReportedPercent, 0)) {
+                            listener.onProgress(0, max);
+                        }
                     }
 
                     @Override
                     public boolean count(long count) {
                         transferred += count;
-                        listener.onProgress(transferred, total);
+                        if (total <= 0) {
+                            return true;
+                        }
+                        int percent = (int) Math.min(100, (transferred * 100L) / total);
+                        if (UploadProgressSteps.shouldReport(lastReportedPercent, percent)) {
+                            listener.onProgress(transferred, total);
+                        }
                         return true;
                     }
 
                     @Override
                     public void end() {
-                        listener.onProgress(total, total);
+                        if (UploadProgressSteps.shouldReport(lastReportedPercent, 100)) {
+                            listener.onProgress(total, total);
+                        }
                     }
                 };
             }
@@ -257,24 +270,53 @@ public final class JschRemoteClient implements RemoteClient {
                                                 int timeoutSeconds,
                                                 Consumer<String> stdOutConsumer,
                                                 Consumer<String> stdErrConsumer) throws Exception {
-        Exception last = null;
+        Exception lastException = null;
+        RemoteCommandResult lastResult = null;
         for (int attempt = 1; attempt <= JschRetry.MAX_ATTEMPTS; attempt++) {
             try {
-                return executeStreamingOnce(command, timeoutSeconds, stdOutConsumer, stdErrConsumer);
+                RemoteCommandResult result = executeStreamingOnce(command, timeoutSeconds, stdOutConsumer, stdErrConsumer);
+                if (result.getExitCode() == 0) {
+                    return result;
+                }
+                lastResult = result;
+                String reason = JschRetry.isUnsetExitStatus(result.getExitCode())
+                        ? "channel closed before exit status (exit=" + result.getExitCode() + ")"
+                        : "exit code " + result.getExitCode();
+                if (attempt >= JschRetry.MAX_ATTEMPTS) {
+                    return result;
+                }
+                notifyExecRetry(stdErrConsumer, attempt, reason);
+                Thread.sleep(JschRetry.DELAY_MS);
+                reconnectSameHost();
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw e;
             } catch (Exception e) {
-                last = e;
-                if (attempt >= JschRetry.MAX_ATTEMPTS || !JschRetry.isTransient(e)) {
+                lastException = e;
+                if (attempt >= JschRetry.MAX_ATTEMPTS) {
                     throw e;
                 }
-                LOG.warn("Remote exec attempt " + attempt + "/" + JschRetry.MAX_ATTEMPTS + " failed, will retry: " + e.getMessage());
+                notifyExecRetry(stdErrConsumer, attempt, e.getMessage());
                 Thread.sleep(JschRetry.DELAY_MS);
                 reconnectSameHost();
             }
         }
-        if (last != null) {
-            throw last;
+        if (lastResult != null) {
+            return lastResult;
+        }
+        if (lastException != null) {
+            throw lastException;
         }
         throw new IllegalStateException("executeStreaming: no result");
+    }
+
+    private void notifyExecRetry(@Nullable Consumer<String> stdErrConsumer, int attempt, String reason) {
+        String retryMsg = "Remote exec attempt " + attempt + "/" + JschRetry.MAX_ATTEMPTS
+                + " failed, will retry: " + reason;
+        LOG.warn(retryMsg);
+        if (stdErrConsumer != null) {
+            stdErrConsumer.accept(retryMsg + "\n");
+        }
     }
 
     private RemoteCommandResult executeStreamingOnce(String command,
@@ -363,7 +405,7 @@ public final class JschRemoteClient implements RemoteClient {
         }
 
         Properties config = new Properties();
-        config.put("StrictHostKeyChecking", "no");
+        JschSessionTuning.apply(config);
         session.setConfig(config);
         session.setServerAliveInterval(5_000);
         return session;
@@ -385,6 +427,7 @@ public final class JschRemoteClient implements RemoteClient {
                 }
                 LOG.warn("SFTP channel open attempt " + attempt + "/" + JschRetry.MAX_ATTEMPTS + " failed, will retry: " + e.getMessage());
                 Thread.sleep(JschRetry.DELAY_MS);
+                reconnectSameHost();
             }
         }
         throw last != null ? last : new IllegalStateException("openSftpChannel failed");

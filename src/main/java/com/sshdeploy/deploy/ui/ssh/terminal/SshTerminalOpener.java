@@ -5,11 +5,11 @@ import com.sshdeploy.deploy.remote.RemoteCredentials;
 import com.sshdeploy.deploy.remote.JschRetry;
 import com.intellij.openapi.project.Project;
 import com.intellij.remoteServer.agent.util.log.TerminalListener;
+import com.jediterm.core.util.TermSize;
 import org.jetbrains.plugins.terminal.TerminalTabState;
-import org.jetbrains.plugins.terminal.TerminalView;
+import org.jetbrains.plugins.terminal.TerminalToolWindowManager;
 import org.jetbrains.plugins.terminal.cloud.CloudTerminalRunner;
 
-import java.awt.Dimension;
 import java.lang.reflect.Constructor;
 
 public final class SshTerminalOpener {
@@ -31,7 +31,7 @@ public final class SshTerminalOpener {
         for (int attempt = 1; attempt <= JschRetry.MAX_ATTEMPTS; attempt++) {
             connector = new JschTtyConnector(target, targetCredentials, null);
             connector.setName(title);
-            ok = connector.init(null);
+            ok = connector.connect();
             if (ok) {
                 break;
             }
@@ -49,14 +49,15 @@ public final class SshTerminalOpener {
         }
         final JschTtyConnector connected = connector;
         ClosableCloudTerminalProcess process = new ClosableCloudTerminalProcess(connected);
-        TerminalListener.TtyResizeHandler resizeHandler = (w, h) -> connected.resize(new Dimension(w, h), new Dimension(0, 0));
+        TerminalListener.TtyResizeHandler resizeHandler =
+                (w, h) -> connected.resize(new TermSize(w, h));
         CloudTerminalRunner runner = createRunner(project, title, process, resizeHandler);
         if (runner == null) {
             throw new IllegalStateException("Cannot create cloud terminal runner");
         }
         TerminalTabState state = new TerminalTabState();
         state.myTabName = title;
-        TerminalView.getInstance(project).createNewSession(runner, state);
+        TerminalToolWindowManager.getInstance(project).createNewSession(runner, state);
         return connected;
     }
 

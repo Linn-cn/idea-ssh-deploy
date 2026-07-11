@@ -1,10 +1,12 @@
 package com.sshdeploy.deploy.ui.command;
 
 import com.sshdeploy.MyMessageBundle;
+import com.sshdeploy.deploy.backup.ConfigSection;
 import com.sshdeploy.deploy.domain.CommandTemplate;
 import com.sshdeploy.deploy.storage.DeployPluginStateService;
 import com.sshdeploy.deploy.ui.common.CommandContentPreview;
 import com.sshdeploy.deploy.ui.common.CommandEditorSupport;
+import com.sshdeploy.deploy.ui.common.ConfigSectionIoSupport;
 import com.sshdeploy.deploy.ui.common.MasterCheckboxColumnHeaderSupport;
 import com.intellij.ui.EditorTextField;
 import com.intellij.ui.components.JBScrollPane;
@@ -103,6 +105,8 @@ public final class CommandManagementPanel extends JPanel {
         JButton searchButton = new JButton(MyMessageBundle.message("command.manager.searchBtn"));
         JButton resetButton = new JButton(MyMessageBundle.message("command.manager.search.reset"));
         JButton addButton = new JButton(MyMessageBundle.message("command.manager.add"));
+        JButton exportButton = new JButton(MyMessageBundle.message("command.manager.export"));
+        JButton importButton = new JButton(MyMessageBundle.message("command.manager.import"));
         topPanel.add(searchButton, gbc);
         gbc.gridx = 4;
         topPanel.add(resetButton, gbc);
@@ -111,6 +115,10 @@ public final class CommandManagementPanel extends JPanel {
         gbc.gridx = 6;
         JButton batchDeleteButton = new JButton(MyMessageBundle.message("command.manager.batchDelete"));
         topPanel.add(batchDeleteButton, gbc);
+        gbc.gridx = 7;
+        topPanel.add(exportButton, gbc);
+        gbc.gridx = 8;
+        topPanel.add(importButton, gbc);
         add(topPanel, BorderLayout.NORTH);
 
         add(new JBScrollPane(table), BorderLayout.CENTER);
@@ -128,6 +136,10 @@ public final class CommandManagementPanel extends JPanel {
             nameSearchField.setText("");
             refreshTable();
         });
+        exportButton.addActionListener(e ->
+                ConfigSectionIoSupport.exportSection(this, ConfigSection.COMMANDS, stateService, null));
+        importButton.addActionListener(e ->
+                ConfigSectionIoSupport.importSection(this, ConfigSection.COMMANDS, stateService, null, this::refreshTable));
         addButton.addActionListener(e -> openEditDialog(null));
         batchDeleteButton.addActionListener(e -> batchDeleteSelectedCommands());
         refreshTable();

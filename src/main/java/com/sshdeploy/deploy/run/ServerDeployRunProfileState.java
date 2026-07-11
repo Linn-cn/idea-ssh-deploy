@@ -9,6 +9,7 @@ import com.sshdeploy.deploy.remote.RemoteCommandResult;
 import com.sshdeploy.deploy.remote.RemoteConnectRequest;
 import com.sshdeploy.deploy.remote.RemoteCredentials;
 import com.sshdeploy.deploy.remote.RemoteShellCommand;
+import com.sshdeploy.deploy.remote.UploadProgressSteps;
 import com.sshdeploy.deploy.security.PasswordSafeCredentialStore;
 import com.sshdeploy.deploy.storage.DeployPluginStateService;
 import com.sshdeploy.deploy.ui.console.DeployConsoleService;
@@ -123,10 +124,9 @@ public final class ServerDeployRunProfileState implements RunProfileState {
                         return;
                     }
                     int percent = (int) Math.min(100, (transferred * 100L) / total);
-                    if (percent <= lastPercent[0]) {
+                    if (!UploadProgressSteps.shouldReport(lastPercent, percent)) {
                         return;
                     }
-                    lastPercent[0] = percent;
                     logProgressOverwrite(processHandler, buildProgressBar(percent));
                 });
             }

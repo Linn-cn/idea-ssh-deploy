@@ -20,15 +20,16 @@
         <li><b>Placeholders</b> — use <code>${fileName}</code> in remote commands for the uploaded file name (e.g. versioned JAR).</li>
         <li><b>Import</b> — import <b>Alibaba Cloud Toolkit (ACT)</b> style XML to migrate faster.</li>
         <li><b>Languages</b> — English and Simplified Chinese UI (follow IDE or override in Settings).</li>
-        <li><b>Configuration backup</b> — export or import servers, commands, and user file match rules as JSON from <b>Settings → SSH Deploy</b> (deduplicated import).</li>
+        <li><b>Configuration backup</b> — full JSON export/import from <b>Settings → SSH Deploy</b>; per-section export/import from the tool window (Servers / Commands / File match rules). Import merges and skips duplicates; section import can also read one section from a full backup file.</li>
+        <li><b>Remote command retry</b> — before/after remote commands retry up to 2 more times on failure (3 attempts total) with SSH reconnect.</li>
     </ul>
 
     <p><b>How to use (Tool window)</b></p>
     <ol>
         <li>Open the <b>SSH Deploy</b> tool window (right tool window bar, or <b>View → Tool Windows</b>).</li>
-        <li>Under <b>Servers</b>, add SSH hosts. Credentials can use the IDE password safe.</li>
-        <li>Under <b>Commands</b>, add multi-line remote shell snippets (with <code>${fileName}</code> placeholder insertion) for Run configurations.</li>
-        <li>Under <b>File match rules</b>, optionally add named regex presets (built-in rows cannot be deleted).</li>
+        <li>Under <b>Servers</b>, add SSH hosts. Credentials can use the IDE password safe. Use <b>Export…</b> / <b>Import…</b> for servers-only JSON (or pick a full backup to import only servers).</li>
+        <li>Under <b>Commands</b>, add multi-line remote shell snippets (with <code>${fileName}</code> placeholder insertion) for Run configurations. Use <b>Export…</b> / <b>Import…</b> for commands-only JSON.</li>
+        <li>Under <b>File match rules</b>, optionally add named regex presets (built-in rows cannot be deleted). Use <b>Export…</b> / <b>Import…</b> for user rules only.</li>
         <li>Use the <b>Console</b> tab for log output from operations that stream there.</li>
     </ol>
 
@@ -63,15 +64,16 @@
         <li><b>占位符</b> — 远程命令中可使用 <code>${fileName}</code> 表示本次上传的文件名（例如带版本号的 JAR）。</li>
         <li><b>导入</b> — 支持导入 <b>Alibaba Cloud Toolkit（ACT）</b> 风格的 XML，便于迁移。</li>
         <li><b>语言</b> — 界面支持英文与简体中文（可跟随 IDE 或在设置中指定）。</li>
-        <li><b>配置备份</b> — 在<b>设置 → SSH Deploy</b> 中将服务器、命令、用户文件匹配规则<b>导出/导入 JSON</b>（导入时自动去重）。</li>
+        <li><b>配置备份</b> — <b>设置 → SSH Deploy</b> 提供全量 JSON 导出/导入；工具窗口的服务器 / 命令 / 文件匹配规则页可分别导出或导入该项（也可从完整备份中只读取该项）。导入为追加合并并去重。</li>
+        <li><b>远程命令重试</b> — 上传前/后远程命令失败时自动再试最多 2 次（共 3 次），并重连 SSH。</li>
     </ul>
 
     <p><b>使用方式（工具窗口）</b></p>
     <ol>
         <li>打开 <b>SSH Deploy</b> 工具窗口（右侧工具窗口条，或通过 <b>视图 → 工具窗口</b>）。</li>
-        <li>在 <b>服务器</b> 中添加 SSH 主机；凭据可写入 IDE 密码保险箱。</li>
-        <li>在 <b>命令</b> 中维护可在运行配置中引用的多行 Shell 片段（支持插入 <code>${fileName}</code> 占位符）。</li>
-        <li>在 <b>文件匹配规则</b> 中按需维护名称与正则（内置行不可删除）。</li>
+        <li>在 <b>服务器</b> 中添加 SSH 主机；凭据可写入 IDE 密码保险箱。可用 <b>导出…</b> / <b>导入…</b> 仅备份或恢复服务器（也可选择完整备份文件，只导入其中的服务器）。</li>
+        <li>在 <b>命令</b> 中维护可在运行配置中引用的多行 Shell 片段（支持插入 <code>${fileName}</code> 占位符）。可用 <b>导出…</b> / <b>导入…</b> 仅处理命令配置。</li>
+        <li>在 <b>文件匹配规则</b> 中按需维护名称与正则（内置行不可删除）。可用 <b>导出…</b> / <b>导入…</b> 仅处理用户规则。</li>
         <li>在 <b>控制台</b> 标签查看会输出到此处的日志。</li>
     </ol>
 
@@ -91,6 +93,14 @@
     ]]></description>
 
     <change-notes><![CDATA[
+    <b>0.0.4</b><br/>
+    <ul>
+        <li>Tool window: per-section JSON export/import for Servers, Commands, and File match rules (also accepts a full backup and reads only that section)</li>
+        <li>Remote commands: on failure, automatically retry up to 2 more times (3 attempts total) with reconnect; progress shown in Run logs</li>
+        <li>Migrate off Terminal / JediTerm / FileChooser / SAXBuilder APIs scheduled for removal or deprecated</li>
+        <li>Upload: prefer faster SSH ciphers (AES-GCM / ChaCha20 first)</li>
+        <li>Upload: refresh progress every 2% instead of every 1%</li>
+    </ul>
     <b>0.0.3</b><br/>
     <ul>
         <li>Run configuration: browse remote upload directory on the selected SSH server (SFTP)</li>

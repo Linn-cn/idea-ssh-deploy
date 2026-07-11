@@ -1,9 +1,11 @@
 package com.sshdeploy.deploy.ui.filematch;
 
 import com.sshdeploy.MyMessageBundle;
+import com.sshdeploy.deploy.backup.ConfigSection;
 import com.sshdeploy.deploy.domain.BuiltinFileMatchRules;
 import com.sshdeploy.deploy.domain.FileMatchRule;
 import com.sshdeploy.deploy.storage.DeployPluginStateService;
+import com.sshdeploy.deploy.ui.common.ConfigSectionIoSupport;
 import com.sshdeploy.deploy.ui.common.MasterCheckboxColumnHeaderSupport;
 import com.intellij.ui.components.JBScrollPane;
 import com.intellij.util.ui.JBUI;
@@ -106,6 +108,8 @@ public final class FileMatchRuleManagementPanel extends JPanel {
         JButton searchButton = new JButton(MyMessageBundle.message("fileMatch.manager.searchBtn"));
         JButton resetButton = new JButton(MyMessageBundle.message("fileMatch.manager.search.reset"));
         JButton addButton = new JButton(MyMessageBundle.message("fileMatch.manager.add"));
+        JButton exportButton = new JButton(MyMessageBundle.message("fileMatch.manager.export"));
+        JButton importButton = new JButton(MyMessageBundle.message("fileMatch.manager.import"));
         topPanel.add(searchButton, gbc);
         gbc.gridx = 4;
         topPanel.add(resetButton, gbc);
@@ -114,6 +118,10 @@ public final class FileMatchRuleManagementPanel extends JPanel {
         gbc.gridx = 6;
         JButton batchDeleteButton = new JButton(MyMessageBundle.message("fileMatch.manager.batchDelete"));
         topPanel.add(batchDeleteButton, gbc);
+        gbc.gridx = 7;
+        topPanel.add(exportButton, gbc);
+        gbc.gridx = 8;
+        topPanel.add(importButton, gbc);
         add(topPanel, BorderLayout.NORTH);
 
         add(new JBScrollPane(table), BorderLayout.CENTER);
@@ -134,6 +142,10 @@ public final class FileMatchRuleManagementPanel extends JPanel {
         });
         addButton.addActionListener(e -> openEditDialog(null));
         batchDeleteButton.addActionListener(e -> batchDeleteSelected());
+        exportButton.addActionListener(e ->
+                ConfigSectionIoSupport.exportSection(this, ConfigSection.FILE_MATCH_RULES, stateService, null));
+        importButton.addActionListener(e ->
+                ConfigSectionIoSupport.importSection(this, ConfigSection.FILE_MATCH_RULES, stateService, null, this::refreshTable));
         refreshTable();
     }
 
