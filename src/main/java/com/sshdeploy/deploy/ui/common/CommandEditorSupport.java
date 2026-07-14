@@ -1,7 +1,6 @@
 package com.sshdeploy.deploy.ui.common;
 
 import com.sshdeploy.MyMessageBundle;
-import com.intellij.icons.AllIcons;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.ui.EditorTextField;
 import com.intellij.ui.components.JBScrollPane;
@@ -9,10 +8,10 @@ import com.intellij.util.ui.JBUI;
 
 import javax.swing.JButton;
 import javax.swing.JList;
-import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import java.awt.BorderLayout;
 import java.awt.Component;
+import java.awt.Dimension;
 
 /**
  * Multiline command editor ({@link EditorTextField}) and {@code ${fileName}} placeholder insertion,
@@ -45,7 +44,7 @@ public final class CommandEditorSupport {
     }
 
     public static JButton createPlaceholderButton(Component parent, EditorTextField targetField) {
-        JButton button = new JButton(AllIcons.Actions.ListFiles);
+        JButton button = new JButton(MyMessageBundle.message("runconfig.placeholder.button"));
         button.setToolTipText(MyMessageBundle.message("runconfig.placeholder.button.tooltip"));
         button.addActionListener(e -> openPlaceholderDialog(parent, targetField));
         return button;
@@ -57,16 +56,16 @@ public final class CommandEditorSupport {
         };
         JList<PlaceholderItem> list = new JList<>(items);
         list.setSelectedIndex(0);
+        list.setVisibleRowCount(Math.max(4, items.length));
         JBScrollPane scrollPane = new JBScrollPane(list);
-        scrollPane.setPreferredSize(new java.awt.Dimension(JBUI.scale(210), JBUI.scale(90)));
-        int result = JOptionPane.showConfirmDialog(
+        scrollPane.setPreferredSize(new Dimension(JBUI.scale(360), JBUI.scale(160)));
+        int result = ResizableConfirmDialog.show(
                 parent,
-                scrollPane,
                 MyMessageBundle.message("runconfig.placeholder.dialog.title"),
-                JOptionPane.OK_CANCEL_OPTION,
-                JOptionPane.PLAIN_MESSAGE
-        );
-        if (result == JOptionPane.OK_OPTION) {
+                scrollPane,
+                new Dimension(JBUI.scale(420), JBUI.scale(260)),
+                new Dimension(JBUI.scale(320), JBUI.scale(200)));
+        if (result == ResizableConfirmDialog.OK_OPTION) {
             PlaceholderItem selected = list.getSelectedValue();
             if (selected != null) {
                 insertPlaceholder(targetField, selected.token);

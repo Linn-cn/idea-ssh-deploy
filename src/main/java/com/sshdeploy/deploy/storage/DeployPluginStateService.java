@@ -1,6 +1,7 @@
 package com.sshdeploy.deploy.storage;
 
 import com.sshdeploy.deploy.domain.BuiltinFileMatchRules;
+import com.sshdeploy.deploy.domain.CommandExecutionType;
 import com.sshdeploy.deploy.domain.CommandTemplate;
 import com.sshdeploy.deploy.domain.FileMatchRule;
 import com.sshdeploy.deploy.domain.DeployProfile;
@@ -42,6 +43,14 @@ public final class DeployPluginStateService implements PersistentStateComponent<
         this.state = state;
         if (this.state.fileMatchRules == null) {
             this.state.fileMatchRules = new ArrayList<>();
+        }
+        if (this.state.commands == null) {
+            this.state.commands = new ArrayList<>();
+        }
+        for (CommandTemplate command : this.state.commands) {
+            if (command != null) {
+                command.setExecutionType(CommandExecutionType.normalize(command.getExecutionType()));
+            }
         }
     }
 

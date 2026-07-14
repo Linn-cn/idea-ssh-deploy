@@ -326,14 +326,7 @@ public final class PluginConfigBackupService {
     }
 
     private static CommandExecutionType parseExecutionType(String raw) {
-        if (raw == null || raw.isBlank()) {
-            return CommandExecutionType.AFTER;
-        }
-        try {
-            return CommandExecutionType.valueOf(raw.trim().toUpperCase(Locale.ROOT));
-        } catch (IllegalArgumentException ex) {
-            return CommandExecutionType.AFTER;
-        }
+        return CommandExecutionType.fromPersisted(raw);
     }
 
     private static String nullToEmpty(String s) {

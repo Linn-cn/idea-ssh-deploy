@@ -2,7 +2,7 @@ package com.sshdeploy.deploy.run;
 
 import com.sshdeploy.MyMessageBundle;
 import com.sshdeploy.deploy.domain.BuiltinFileMatchRules;
-import com.sshdeploy.deploy.domain.CommandTemplate;
+import com.sshdeploy.deploy.domain.CommandExecutionType;
 import com.sshdeploy.deploy.domain.FileMatchRule;
 import com.sshdeploy.deploy.domain.ServerProfile;
 import com.sshdeploy.deploy.importer.ActWorkspaceXmlParser;
@@ -10,9 +10,12 @@ import com.sshdeploy.deploy.pipeline.CredentialResolver;
 import com.sshdeploy.deploy.remote.RemoteCredentials;
 import com.sshdeploy.deploy.storage.DeployPluginStateService;
 import com.sshdeploy.deploy.security.PasswordSafeCredentialStore;
+import com.sshdeploy.deploy.ui.command.CommandFormDialog;
+import com.sshdeploy.deploy.ui.command.CommandSelectSupport;
 import com.sshdeploy.deploy.ui.common.ComboPreviewHtml;
 import com.sshdeploy.deploy.ui.common.CommandContentPreview;
 import com.sshdeploy.deploy.ui.common.CommandEditorSupport;
+import com.sshdeploy.deploy.ui.server.ServerFormDialog;
 import com.intellij.openapi.fileChooser.FileChooser;
 import com.intellij.openapi.fileChooser.FileChooserDescriptor;
 import com.intellij.openapi.fileChooser.FileChooserDescriptorFactory;
@@ -43,6 +46,7 @@ import javax.swing.UIManager;
 import javax.swing.text.JTextComponent;
 import java.awt.BorderLayout;
 import java.awt.FileDialog;
+import java.awt.FlowLayout;
 import java.awt.Font;
 import java.awt.Frame;
 import java.awt.GridBagConstraints;
@@ -56,7 +60,6 @@ import java.util.regex.PatternSyntaxException;
 public final class ServerDeploySettingsEditor extends SettingsEditor<ServerDeployRunConfiguration> {
     private static final String MODE_DIRECT = "DIRECT_FILE";
     private static final String MODE_REGEX = "DIR_REGEX";
-    private static final int COMMAND_COMBO_PREVIEW_LINES = 3;
     private static final int REGEX_COMBO_PREVIEW_LINES = 2;
     private static final javax.swing.border.Border DEFAULT_BORDER = JBUI.Borders.customLine(JBColor.border(), 1);
     private static final javax.swing.border.Border ERROR_BORDER = JBUI.Borders.customLine(JBColor.RED, 1);
@@ -70,6 +73,7 @@ public final class ServerDeploySettingsEditor extends SettingsEditor<ServerDeplo
     private final String defaultChooserDir;
     private final JPanel panel;
     private final JComboBox<ServerItem> serverCombo;
+    private final JButton addServerBtn;
     private final JComboBox<ModeItem> uploadModeCombo;
     private final JTextField uploadFileField;
     private final JTextField uploadDirectoryField;
@@ -77,14 +81,14 @@ public final class ServerDeploySettingsEditor extends SettingsEditor<ServerDeplo
     private final JTextField regexField;
     private final JButton regexRuleApplyBtn;
     private final EditorTextField preCommandsArea;
-    private final JComboBox<CommandItem> preCommandCombo;
-    private final JButton preCommandAddBtn;
+    private final JButton preCommandSelectBtn;
+    private final JButton preCommandSaveBtn;
     private final JTextField remoteDirField;
     private final EditorTextField postCommandsArea;
-    private final JComboBox<CommandItem> postCommandCombo;
-    private final JButton postCommandAddBtn;
-    private final JComboBox<CommandItem> terminalCommandCombo;
-    private final JButton terminalCommandUseBtn;
+    private final JButton postCommandSelectBtn;
+    private final JButton postCommandSaveBtn;
+    private final JButton terminalCommandSelectBtn;
+    private final JButton terminalCommandSaveBtn;
     private final JTextField terminalCommandField;
     private final JPanel directFileRow;
     private final JPanel regexRow1;
@@ -102,6 +106,8 @@ public final class ServerDeploySettingsEditor extends SettingsEditor<ServerDeplo
         gbc.fill = GridBagConstraints.HORIZONTAL;
 
         serverCombo = new JComboBox<>();
+        addServerBtn = new JButton(MyMessageBundle.message("runconfig.server.add"));
+        addServerBtn.setToolTipText(MyMessageBundle.message("runconfig.server.add.tooltip"));
         uploadModeCombo = new JComboBox<>(new ModeItem[]{
                 new ModeItem(MODE_DIRECT, MyMessageBundle.message("runconfig.upload.mode.direct")),
                 new ModeItem(MODE_REGEX, MyMessageBundle.message("runconfig.upload.mode.regex"))
@@ -112,22 +118,21 @@ public final class ServerDeploySettingsEditor extends SettingsEditor<ServerDeplo
         regexField = new JTextField();
 
         preCommandsArea = CommandEditorSupport.createMultilineField(4);
-        preCommandCombo = new JComboBox<>();
-        preCommandAddBtn = new JButton(MyMessageBundle.message("runconfig.command.add"));
+        preCommandSelectBtn = new JButton(MyMessageBundle.message("runconfig.command.select"));
+        preCommandSaveBtn = createSaveCommandButton();
         regexRuleApplyBtn = new JButton(MyMessageBundle.message("runconfig.regex.apply"));
 
         remoteDirField = new JTextField();
         postCommandsArea = CommandEditorSupport.createMultilineField(5);
-        postCommandCombo = new JComboBox<>();
-        postCommandAddBtn = new JButton(MyMessageBundle.message("runconfig.command.add"));
-        terminalCommandCombo = new JComboBox<>();
-        terminalCommandUseBtn = new JButton(MyMessageBundle.message("runconfig.command.add"));
+        postCommandSelectBtn = new JButton(MyMessageBundle.message("runconfig.command.select"));
+        postCommandSaveBtn = createSaveCommandButton();
+        terminalCommandSelectBtn = new JButton(MyMessageBundle.message("runconfig.command.select"));
+        terminalCommandSaveBtn = createSaveCommandButton();
         terminalCommandField = new JTextField();
 
         applyCompactRunConfigFieldWidths(
                 serverCombo, uploadModeCombo, uploadFileField, uploadDirectoryField,
-                regexRuleCombo, regexField, preCommandCombo, postCommandCombo,
-                terminalCommandCombo, remoteDirField, terminalCommandField);
+                regexRuleCombo, regexField, remoteDirField, terminalCommandField);
 
         applyIdeaFont(uploadFileField, uploadDirectoryField, regexField, preCommandsArea, remoteDirField, postCommandsArea, terminalCommandField);
         applyInputPadding();
@@ -145,38 +150,39 @@ public final class ServerDeploySettingsEditor extends SettingsEditor<ServerDeplo
 
         JButton chooseRemoteDirBtn = new JButton(MyMessageBundle.message("runconfig.choose.remoteDir"));
         chooseRemoteDirBtn.addActionListener(e -> chooseRemoteDirectory());
-        JPanel preRow = commandRow(preCommandCombo, preCommandAddBtn);
-        JPanel postRow = commandRow(postCommandCombo, postCommandAddBtn);
-        JPanel terminalRow = commandRow(terminalCommandCombo, terminalCommandUseBtn);
+        JPanel serverRow = commandRow(serverCombo, addServerBtn);
         JButton prePlaceholderBtn = CommandEditorSupport.createPlaceholderButton(panel, preCommandsArea);
         JButton postPlaceholderBtn = CommandEditorSupport.createPlaceholderButton(panel, postCommandsArea);
 
         int row = 0;
-        addRow(form, gbc, row++, MyMessageBundle.message("runconfig.editor.server.single"), serverCombo);
+        addRow(form, gbc, row++, MyMessageBundle.message("runconfig.editor.server.single"), serverRow);
         addRow(form, gbc, row++, MyMessageBundle.message("runconfig.editor.buildType"), uploadModeCombo);
         addRow(form, gbc, row++, "", directFileRow);
         addRow(form, gbc, row++, "", regexRow1);
         addRow(form, gbc, row++, "", regexRow2);
         addRow(form, gbc, row++, "", regexRow4);
-        addRow(form, gbc, row++, MyMessageBundle.message("runconfig.editor.preCommands.select"), preRow);
-        addRow(form, gbc, row++, MyMessageBundle.message("runconfig.editor.preCommands"), rowWithButton("", preCommandsArea, prePlaceholderBtn));
+        addRow(form, gbc, row++, MyMessageBundle.message("runconfig.editor.preCommands"),
+                fieldWithButtonsBelow(preCommandsArea, preCommandSelectBtn, prePlaceholderBtn, preCommandSaveBtn));
         addRow(form, gbc, row++, MyMessageBundle.message("runconfig.editor.remoteDir"),
                 rowWithButton("", remoteDirField, chooseRemoteDirBtn));
-        addRow(form, gbc, row++, MyMessageBundle.message("runconfig.editor.postCommands.select"), postRow);
-        addRow(form, gbc, row++, MyMessageBundle.message("runconfig.editor.postCommands"), rowWithButton("", postCommandsArea, postPlaceholderBtn));
-        addRow(form, gbc, row++, MyMessageBundle.message("runconfig.editor.terminalCommand.select"), terminalRow);
-        addRow(form, gbc, row, MyMessageBundle.message("runconfig.editor.terminalCommand"), terminalCommandField);
+        addRow(form, gbc, row++, MyMessageBundle.message("runconfig.editor.postCommands"),
+                fieldWithButtonsBelow(postCommandsArea, postCommandSelectBtn, postPlaceholderBtn, postCommandSaveBtn));
+        addRow(form, gbc, row, MyMessageBundle.message("runconfig.editor.terminalCommand"),
+                fieldWithButtonsBelow(terminalCommandField, terminalCommandSelectBtn, terminalCommandSaveBtn));
 
         panel.add(new JBScrollPane(form), BorderLayout.CENTER);
 
         refreshServersInternal();
-        refreshCommandCombos();
         refreshFileRegexRuleCombo();
         serverCombo.setSelectedItem(null);
         uploadModeCombo.addActionListener(e -> refreshUploadModeVisibility());
-        preCommandAddBtn.addActionListener(e -> appendSelectedCommand(preCommandCombo, preCommandsArea));
-        postCommandAddBtn.addActionListener(e -> appendSelectedCommand(postCommandCombo, postCommandsArea));
-        terminalCommandUseBtn.addActionListener(e -> setTextFromSelectedCommand(terminalCommandCombo, terminalCommandField));
+        addServerBtn.addActionListener(e -> addServerInline());
+        preCommandSelectBtn.addActionListener(e -> pickAndAppendCommand(CommandExecutionType.BEFORE, preCommandsArea));
+        postCommandSelectBtn.addActionListener(e -> pickAndAppendCommand(CommandExecutionType.AFTER, postCommandsArea));
+        terminalCommandSelectBtn.addActionListener(e -> pickAndAppendTerminalCommand());
+        preCommandSaveBtn.addActionListener(e -> saveCommandFromInput(preCommandsArea.getText(), CommandExecutionType.BEFORE));
+        postCommandSaveBtn.addActionListener(e -> saveCommandFromInput(postCommandsArea.getText(), CommandExecutionType.AFTER));
+        terminalCommandSaveBtn.addActionListener(e -> saveCommandFromInput(terminalCommandField.getText(), CommandExecutionType.TERMINAL));
         regexRuleApplyBtn.addActionListener(e -> {
             FileRegexRuleItem item = (FileRegexRuleItem) regexRuleCombo.getSelectedItem();
             if (item == null || item.regex == null || item.regex.isBlank()) {
@@ -190,7 +196,6 @@ public final class ServerDeploySettingsEditor extends SettingsEditor<ServerDeplo
     @Override
     protected void resetEditorFrom(ServerDeployRunConfiguration configuration) {
         refreshServersInternal();
-        refreshCommandCombos();
         refreshFileRegexRuleCombo();
         selectServer(configuration.getServerId());
         selectMode(configuration.getUploadMode());
@@ -201,7 +206,6 @@ public final class ServerDeploySettingsEditor extends SettingsEditor<ServerDeplo
         preCommandsArea.setText(configuration.getPreDeployCommands());
         remoteDirField.setText(configuration.getRemoteUploadDir());
         postCommandsArea.setText(configuration.getPostDeployCommands());
-        selectCommandById(terminalCommandCombo, configuration.getTerminalCommandRef());
         terminalCommandField.setText(configuration.getTerminalCommand());
         resetFieldBorders();
         refreshUploadModeVisibility();
@@ -256,8 +260,7 @@ public final class ServerDeploySettingsEditor extends SettingsEditor<ServerDeplo
         configuration.setPreDeployCommands(preCommandsArea.getText().trim());
         configuration.setRemoteUploadDir(remoteDir);
         configuration.setPostDeployCommands(postCommandsArea.getText().trim());
-        CommandItem terminalItem = (CommandItem) terminalCommandCombo.getSelectedItem();
-        configuration.setTerminalCommandRef(terminalItem == null ? "" : terminalItem.id);
+        configuration.setTerminalCommandRef("");
         configuration.setTerminalCommand(terminalCommandField.getText().trim());
     }
 
@@ -279,23 +282,58 @@ public final class ServerDeploySettingsEditor extends SettingsEditor<ServerDeplo
         }
     }
 
-    private void refreshCommandCombos() {
-        preCommandCombo.removeAllItems();
-        postCommandCombo.removeAllItems();
-        terminalCommandCombo.removeAllItems();
-        CommandItem empty = new CommandItem("", MyMessageBundle.message("runconfig.command.none"), "");
-        preCommandCombo.addItem(empty);
-        postCommandCombo.addItem(empty);
-        terminalCommandCombo.addItem(empty);
-        for (CommandTemplate command : stateService.getCommands()) {
-            CommandItem item = new CommandItem(command.getId(), command.getName(), command.getContent());
-            preCommandCombo.addItem(item);
-            postCommandCombo.addItem(item);
-            terminalCommandCombo.addItem(item);
+    private void addServerInline() {
+        PasswordSafeCredentialStore credentialStore = new PasswordSafeCredentialStore();
+        ServerFormDialog dialog = new ServerFormDialog(panel, stateService, credentialStore, null);
+        dialog.setVisible(true);
+        if (!dialog.isSaved() || dialog.getSavedProfile() == null) {
+            return;
         }
-        preCommandCombo.setSelectedIndex(0);
-        postCommandCombo.setSelectedIndex(0);
-        terminalCommandCombo.setSelectedIndex(0);
+        String newId = dialog.getSavedProfile().getId();
+        refreshServersInternal();
+        selectServer(newId);
+    }
+
+    private void pickAndAppendCommand(CommandExecutionType slot, EditorTextField area) {
+        CommandSelectSupport.pickCommand(panel, stateService, slot).ifPresent(command -> {
+            String content = command.getContent() == null ? "" : command.getContent().trim();
+            if (content.isBlank()) {
+                return;
+            }
+            String existing = area.getText().trim();
+            area.setText(existing.isBlank() ? content : existing + System.lineSeparator() + content);
+        });
+    }
+
+    private void pickAndAppendTerminalCommand() {
+        CommandSelectSupport.pickCommand(panel, stateService, CommandExecutionType.TERMINAL).ifPresent(command -> {
+            String content = command.getContent() == null ? "" : command.getContent().trim();
+            if (content.isBlank()) {
+                return;
+            }
+            String existing = terminalCommandField.getText().trim();
+            terminalCommandField.setText(existing.isBlank() ? content : existing + System.lineSeparator() + content);
+        });
+    }
+
+    private void saveCommandFromInput(String content, CommandExecutionType defaultType) {
+        String trimmed = content == null ? "" : content.trim();
+        if (trimmed.isBlank()) {
+            JOptionPane.showMessageDialog(
+                    panel,
+                    MyMessageBundle.message("runconfig.command.save.empty"),
+                    MyMessageBundle.message("runconfig.command.save"),
+                    JOptionPane.INFORMATION_MESSAGE);
+            return;
+        }
+        CommandFormDialog dialog = new CommandFormDialog(panel, stateService, trimmed, defaultType);
+        dialog.setVisible(true);
+    }
+
+    private static JButton createSaveCommandButton() {
+        JButton button = new JButton(MyMessageBundle.message("runconfig.command.save"));
+        button.setToolTipText(MyMessageBundle.message("runconfig.command.save.tooltip"));
+        return button;
     }
 
     private void refreshFileRegexRuleCombo() {
@@ -328,23 +366,6 @@ public final class ServerDeploySettingsEditor extends SettingsEditor<ServerDeplo
         }
     }
 
-    private static void appendSelectedCommand(JComboBox<CommandItem> combo, EditorTextField area) {
-        CommandItem item = (CommandItem) combo.getSelectedItem();
-        if (item == null || item.content.isBlank()) {
-            return;
-        }
-        String existing = area.getText().trim();
-        area.setText(existing.isBlank() ? item.content : existing + System.lineSeparator() + item.content);
-    }
-
-    private static void setTextFromSelectedCommand(JComboBox<CommandItem> combo, JTextField field) {
-        CommandItem item = (CommandItem) combo.getSelectedItem();
-        if (item == null || item.content.isBlank()) {
-            return;
-        }
-        field.setText(item.content);
-    }
-
     private void selectServer(String id) {
         if (id == null || id.isBlank()) {
             serverCombo.setSelectedItem(null);
@@ -358,21 +379,6 @@ public final class ServerDeploySettingsEditor extends SettingsEditor<ServerDeplo
             }
         }
         serverCombo.setSelectedItem(null);
-    }
-
-    private void selectCommandById(JComboBox<CommandItem> combo, String id) {
-        if (id == null || id.isBlank()) {
-            combo.setSelectedIndex(0);
-            return;
-        }
-        for (int i = 0; i < combo.getItemCount(); i++) {
-            CommandItem item = combo.getItemAt(i);
-            if (id.equals(item.id)) {
-                combo.setSelectedIndex(i);
-                return;
-            }
-        }
-        combo.setSelectedIndex(0);
     }
 
     private void refreshUploadModeVisibility() {
@@ -409,7 +415,20 @@ public final class ServerDeploySettingsEditor extends SettingsEditor<ServerDeplo
         return row;
     }
 
-    private static JPanel commandRow(JComboBox<CommandItem> combo, JButton addButton) {
+    /** Field on top, action buttons on the next row (left-aligned under the field). */
+    private static JPanel fieldWithButtonsBelow(JComponent field, JButton... buttons) {
+        JPanel stack = new JPanel(new BorderLayout(0, JBUI.scale(6)));
+        stack.add(field, BorderLayout.CENTER);
+        JPanel buttonRow = new JPanel(new FlowLayout(FlowLayout.LEFT, JBUI.scale(6), 0));
+        buttonRow.setOpaque(false);
+        for (JButton button : buttons) {
+            buttonRow.add(button);
+        }
+        stack.add(buttonRow, BorderLayout.SOUTH);
+        return stack;
+    }
+
+    private static JPanel commandRow(JComboBox<?> combo, JButton addButton) {
         JPanel row = new JPanel(new BorderLayout(6, 0));
         row.add(combo, BorderLayout.CENTER);
         row.add(addButton, BorderLayout.EAST);
@@ -423,11 +442,12 @@ public final class ServerDeploySettingsEditor extends SettingsEditor<ServerDeplo
         gbc.weightx = 0;
         gbc.weighty = 0;
         gbc.fill = GridBagConstraints.NONE;
-        gbc.anchor = GridBagConstraints.WEST;
+        gbc.anchor = GridBagConstraints.NORTHWEST;
         panel.add(label.isEmpty() ? new JLabel() : new JLabel(label), gbc);
         gbc.gridx = 1;
         gbc.weightx = 1;
         gbc.fill = GridBagConstraints.HORIZONTAL;
+        gbc.anchor = GridBagConstraints.NORTHWEST;
         panel.add(component, gbc);
     }
 
@@ -441,18 +461,12 @@ public final class ServerDeploySettingsEditor extends SettingsEditor<ServerDeplo
                                                          JTextField uploadDirectoryField,
                                                          JComboBox<FileRegexRuleItem> regexRuleCombo,
                                                          JTextField regexField,
-                                                         JComboBox<CommandItem> preCommandCombo,
-                                                         JComboBox<CommandItem> postCommandCombo,
-                                                         JComboBox<CommandItem> terminalCommandCombo,
                                                          JTextField remoteDirField,
                                                          JTextField terminalCommandField) {
         int minW = JBUI.scale(160);
         applyGrowableCombo(serverCombo, minW);
         applyGrowableCombo(uploadModeCombo, minW);
         applyGrowableCombo(regexRuleCombo, minW);
-        applyGrowableCombo(preCommandCombo, minW);
-        applyGrowableCombo(postCommandCombo, minW);
-        applyGrowableCombo(terminalCommandCombo, minW);
         for (JTextField field : new JTextField[]{
                 uploadFileField, uploadDirectoryField, regexField, remoteDirField, terminalCommandField}) {
             java.awt.Dimension h = field.getPreferredSize();
@@ -636,9 +650,6 @@ public final class ServerDeploySettingsEditor extends SettingsEditor<ServerDeplo
         int maxRows = 12;
         serverCombo.setMaximumRowCount(maxRows);
         regexRuleCombo.setMaximumRowCount(maxRows);
-        preCommandCombo.setMaximumRowCount(maxRows);
-        postCommandCombo.setMaximumRowCount(maxRows);
-        terminalCommandCombo.setMaximumRowCount(maxRows);
 
         serverCombo.setRenderer(new DefaultListCellRenderer() {
             @Override
@@ -662,10 +673,6 @@ public final class ServerDeploySettingsEditor extends SettingsEditor<ServerDeplo
                 return label;
             }
         });
-
-        preCommandCombo.setRenderer(createCommandPreviewRenderer());
-        postCommandCombo.setRenderer(createCommandPreviewRenderer());
-        terminalCommandCombo.setRenderer(createCommandPreviewRenderer());
 
         regexRuleCombo.setRenderer(new DefaultListCellRenderer() {
             @Override
@@ -730,32 +737,6 @@ public final class ServerDeploySettingsEditor extends SettingsEditor<ServerDeplo
         return prefix + item.host.trim() + ":" + item.port;
     }
 
-    private static DefaultListCellRenderer createCommandPreviewRenderer() {
-        return new DefaultListCellRenderer() {
-            @Override
-            public java.awt.Component getListCellRendererComponent(JList<?> list,
-                                                                   Object value,
-                                                                   int index,
-                                                                   boolean isSelected,
-                                                                   boolean cellHasFocus) {
-                JLabel label = (JLabel) super.getListCellRendererComponent(list, value, index, isSelected, cellHasFocus);
-                if (!(value instanceof CommandItem item)) {
-                    return label;
-                }
-                if (index < 0) {
-                    label.setText(item.name);
-                    label.setToolTipText(null);
-                    label.setVerticalAlignment(SwingConstants.CENTER);
-                } else {
-                    String detail = CommandContentPreview.toHtmlBody(item.content, COMMAND_COMBO_PREVIEW_LINES);
-                    label.setText(ComboPreviewHtml.titledPreview(item.name, detail));
-                    label.setVerticalAlignment(SwingConstants.TOP);
-                }
-                return label;
-            }
-        };
-    }
-
     private void replaceRegexField(String regex) {
         if (regex == null) {
             return;
@@ -817,23 +798,6 @@ public final class ServerDeploySettingsEditor extends SettingsEditor<ServerDeplo
             this.port = port;
             this.username = username == null ? "" : username;
             this.description = description == null ? "" : description;
-        }
-
-        @Override
-        public String toString() {
-            return name;
-        }
-    }
-
-    private static final class CommandItem {
-        private final String id;
-        private final String name;
-        private final String content;
-
-        private CommandItem(String id, String name, String content) {
-            this.id = id;
-            this.name = name;
-            this.content = content == null ? "" : content.trim();
         }
 
         @Override

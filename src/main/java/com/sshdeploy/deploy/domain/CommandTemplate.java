@@ -8,7 +8,7 @@ public class CommandTemplate {
     private String content = "";
     private int timeoutSeconds = 60;
     private boolean failFast = true;
-    private CommandExecutionType executionType = CommandExecutionType.AFTER;
+    private CommandExecutionType executionType = CommandExecutionType.GENERAL;
 
     public String getId() {
         return id;
@@ -51,10 +51,10 @@ public class CommandTemplate {
     }
 
     public CommandExecutionType getExecutionType() {
-        return executionType;
+        return CommandExecutionType.normalize(executionType);
     }
 
     public void setExecutionType(CommandExecutionType executionType) {
-        this.executionType = executionType;
+        this.executionType = CommandExecutionType.normalize(executionType);
     }
 }
