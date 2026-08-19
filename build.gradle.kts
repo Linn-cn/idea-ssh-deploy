@@ -4,7 +4,7 @@ plugins {
 }
 
 group = "com.sshdeploy"
-version = "0.0.5"
+version = "0.0.6"
 
 java {
     toolchain {
@@ -48,6 +48,10 @@ intellijPlatform {
 
         // Patched into plugin.xml at build time — keep in sync with src/main/resources/META-INF/plugin.xml change-notes.
         changeNotes = """
+            <b>0.0.6</b><br/>
+            <ul>
+                <li>Servers tool window: Terminal button after Copy opens an IDE Terminal tab for that host (uses stored credentials)<br/>服务器管理：复制按钮后新增「终端」，点击后用已保存凭据在 IDEA Terminal 中打开该服务器</li>
+            </ul>
             <b>0.0.5</b><br/>
             <ul>
                 <li>Run configuration: add SSH server inline next to the server dropdown (reuses the full server form)<br/>运行配置：在 SSH 服务器下拉旁可内联新增服务器（复用完整服务器表单）</li>

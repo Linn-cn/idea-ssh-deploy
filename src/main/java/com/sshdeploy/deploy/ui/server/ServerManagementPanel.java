@@ -3,12 +3,24 @@ package com.sshdeploy.deploy.ui.server;
 import com.sshdeploy.MyMessageBundle;
 import com.sshdeploy.deploy.backup.ConfigSection;
 import com.sshdeploy.deploy.domain.ServerProfile;
+import com.sshdeploy.deploy.pipeline.CredentialResolver;
+import com.sshdeploy.deploy.remote.RemoteCredentials;
+import com.sshdeploy.deploy.remote.ServerStatusCollector;
+import com.sshdeploy.deploy.remote.ServerStatusSnapshot;
 import com.sshdeploy.deploy.security.CredentialStore;
 import com.sshdeploy.deploy.storage.DeployPluginStateService;
 import com.sshdeploy.deploy.ui.common.ConfigSectionIoSupport;
 import com.sshdeploy.deploy.ui.common.MasterCheckboxColumnHeaderSupport;
+import com.sshdeploy.deploy.ui.ssh.terminal.SshTerminalOpener;
+import com.intellij.openapi.application.ApplicationManager;
+import com.intellij.openapi.progress.ProgressIndicator;
+import com.intellij.openapi.progress.ProgressManager;
+import com.intellij.openapi.progress.Task;
+import com.intellij.openapi.project.Project;
+import com.intellij.openapi.ui.Messages;
 import com.intellij.ui.components.JBScrollPane;
 import com.intellij.util.ui.JBUI;
+import org.jetbrains.annotations.NotNull;
 
 import javax.swing.AbstractCellEditor;
 import javax.swing.Box;
@@ -22,6 +34,7 @@ import javax.swing.JPanel;
 import javax.swing.JTable;
 import javax.swing.JTextField;
 import javax.swing.SwingConstants;
+import javax.swing.SwingUtilities;
 import javax.swing.UIManager;
 import javax.swing.table.TableCellEditor;
 import javax.swing.table.TableCellRenderer;
@@ -40,6 +53,7 @@ import java.awt.datatransfer.StringSelection;
 import java.util.Objects;
 
 public final class ServerManagementPanel extends JPanel {
+    private final Project project;
     private final DeployPluginStateService stateService;
     private final CredentialStore credentialStore;
     private final DefaultTableModel tableModel;
@@ -49,8 +63,9 @@ public final class ServerManagementPanel extends JPanel {
     /** Row index in the table → server id (same order as {@link #refreshTable}) */
     private final List<String> visibleServerIds = new ArrayList<>();
 
-    public ServerManagementPanel(DeployPluginStateService stateService, CredentialStore credentialStore) {
+    public ServerManagementPanel(Project project, DeployPluginStateService stateService, CredentialStore credentialStore) {
         super(new BorderLayout());
+        this.project = project;
         this.stateService = stateService;
         this.credentialStore = credentialStore;
         this.tableModel = new DefaultTableModel(new Object[]{
@@ -251,7 +266,7 @@ public final class ServerManagementPanel extends JPanel {
         table.getColumnModel().getColumn(3).setPreferredWidth(80);
         table.getColumnModel().getColumn(4).setPreferredWidth(140);
         table.getColumnModel().getColumn(5).setPreferredWidth(180);
-        table.getColumnModel().getColumn(6).setPreferredWidth(300);
+        table.getColumnModel().getColumn(6).setPreferredWidth(460);
         table.getTableHeader().setReorderingAllowed(false);
         table.setIntercellSpacing(new java.awt.Dimension(8, 4));
         table.setShowGrid(false);
@@ -286,6 +301,8 @@ public final class ServerManagementPanel extends JPanel {
         private final JButton editButton;
         private final JButton deleteButton;
         private final JButton copyButton;
+        private final JButton terminalButton;
+        private final JButton statusButton;
         private int row = -1;
 
         private OperationCellEditor() {
@@ -293,9 +310,13 @@ public final class ServerManagementPanel extends JPanel {
             editButton = new JButton(MyMessageBundle.message("server.manager.edit"));
             deleteButton = new JButton(MyMessageBundle.message("server.manager.delete"));
             copyButton = new JButton(MyMessageBundle.message("common.copy"));
+            terminalButton = new JButton(MyMessageBundle.message("server.manager.terminal"));
+            statusButton = new JButton(MyMessageBundle.message("server.manager.status"));
             panel.add(editButton);
             panel.add(deleteButton);
             panel.add(copyButton);
+            panel.add(terminalButton);
+            panel.add(statusButton);
             panel.setBorder(javax.swing.BorderFactory.createEmptyBorder(2, 6, 2, 0));
             editButton.addActionListener(e -> {
                 stopCellEditing();
@@ -330,6 +351,14 @@ public final class ServerManagementPanel extends JPanel {
                 stopCellEditing();
                 copyRowAt(row, 1, 5);
             });
+            terminalButton.addActionListener(e -> {
+                stopCellEditing();
+                openTerminalAt(row);
+            });
+            statusButton.addActionListener(e -> {
+                stopCellEditing();
+                openStatusAt(row);
+            });
         }
 
         @Override
@@ -349,11 +378,15 @@ public final class ServerManagementPanel extends JPanel {
         private final JButton editButton = new JButton(MyMessageBundle.message("server.manager.edit"));
         private final JButton deleteButton = new JButton(MyMessageBundle.message("server.manager.delete"));
         private final JButton copyButton = new JButton(MyMessageBundle.message("common.copy"));
+        private final JButton terminalButton = new JButton(MyMessageBundle.message("server.manager.terminal"));
+        private final JButton statusButton = new JButton(MyMessageBundle.message("server.manager.status"));
 
         private OperationCellRenderer() {
             panel.add(editButton);
             panel.add(deleteButton);
             panel.add(copyButton);
+            panel.add(terminalButton);
+            panel.add(statusButton);
             panel.setBorder(javax.swing.BorderFactory.createEmptyBorder(2, 6, 2, 0));
             java.awt.Color bg = UIManager.getColor("Button.background");
             java.awt.Color fg = UIManager.getColor("Button.foreground");
@@ -361,11 +394,15 @@ public final class ServerManagementPanel extends JPanel {
                 editButton.setBackground(bg);
                 deleteButton.setBackground(bg);
                 copyButton.setBackground(bg);
+                terminalButton.setBackground(bg);
+                statusButton.setBackground(bg);
             }
             if (fg != null) {
                 editButton.setForeground(fg);
                 deleteButton.setForeground(fg);
                 copyButton.setForeground(fg);
+                terminalButton.setForeground(fg);
+                statusButton.setForeground(fg);
             }
         }
 
@@ -393,6 +430,60 @@ public final class ServerManagementPanel extends JPanel {
         field.setMinimumSize(new java.awt.Dimension(minW, h.height));
         field.setPreferredSize(new java.awt.Dimension(prefW, h.height));
         field.setMaximumSize(new java.awt.Dimension(prefW + JBUI.scale(40), h.height));
+    }
+
+    private void openStatusAt(int row) {
+        ServerProfile profile = serverAtRow(row);
+        if (profile == null) {
+            return;
+        }
+        ProgressManager.getInstance().run(new Task.Modal(project, MyMessageBundle.message("server.manager.status.collecting"), true) {
+            private ServerStatusSnapshot snapshot;
+
+            @Override
+            public void run(@NotNull ProgressIndicator indicator) {
+                indicator.setIndeterminate(true);
+                try {
+                    RemoteCredentials credentials = new CredentialResolver().resolve(profile, credentialStore);
+                    snapshot = new ServerStatusCollector().collect(profile, credentials);
+                } catch (Exception ex) {
+                    throw new RuntimeException(ex.getMessage(), ex);
+                }
+            }
+
+            @Override
+            public void onSuccess() {
+                SwingUtilities.invokeLater(() ->
+                        new ServerStatusDialog(ServerManagementPanel.this, profile, snapshot).setVisible(true));
+            }
+
+            @Override
+            public void onThrowable(@NotNull Throwable error) {
+                Messages.showErrorDialog(
+                        ServerManagementPanel.this,
+                        MyMessageBundle.message("server.manager.status.failed", error.getMessage()),
+                        MyMessageBundle.message("server.manager.status"));
+            }
+        });
+    }
+
+    private void openTerminalAt(int row) {
+        ServerProfile profile = serverAtRow(row);
+        if (profile == null) {
+            return;
+        }
+        ApplicationManager.getApplication().executeOnPooledThread(() -> {
+            try {
+                RemoteCredentials credentials = new CredentialResolver().resolve(profile, credentialStore);
+                new SshTerminalOpener().open(project, profile, credentials);
+            } catch (Exception ex) {
+                SwingUtilities.invokeLater(() -> JOptionPane.showMessageDialog(
+                        ServerManagementPanel.this,
+                        MyMessageBundle.message("ui.log.terminal.openFailed", ex.getMessage()),
+                        MyMessageBundle.message("server.manager.terminal"),
+                        JOptionPane.ERROR_MESSAGE));
+            }
+        });
     }
 
     private void copyRowAt(int row, int startColumn, int endColumn) {

@@ -26,7 +26,7 @@ public final class MyToolWindowFactory implements ToolWindowFactory {
         PasswordSafeCredentialStore credentialStore = new PasswordSafeCredentialStore();
         JTabbedPane tabs = new JTabbedPane();
         tabs.addTab(MyMessageBundle.message("toolwindow.tab.servers"),
-                new ServerManagementPanel(stateService, credentialStore));
+                new ServerManagementPanel(project, stateService, credentialStore));
         tabs.addTab(MyMessageBundle.message("toolwindow.tab.commands"),
                 new CommandManagementPanel(stateService));
         tabs.addTab(MyMessageBundle.message("toolwindow.tab.fileMatch"),
