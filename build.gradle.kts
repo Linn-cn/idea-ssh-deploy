@@ -51,6 +51,7 @@ intellijPlatform {
             <b>0.0.6</b><br/>
             <ul>
                 <li>Servers tool window: Terminal button after Copy opens an IDE Terminal tab for that host (uses stored credentials)<br/>服务器管理：复制按钮后新增「终端」，点击后用已保存凭据在 IDEA Terminal 中打开该服务器</li>
+                <li>Servers tool window: Status button collects live host metrics over SSH and shows a dialog (hostname, OS, CPU, load, memory, swap, disks including inodes)<br/>服务器管理：新增「状态」，通过 SSH 采集并弹窗展示主机实时指标（主机名、系统、CPU、负载、内存、交换分区、磁盘容量与 inode）</li>
             </ul>
             <b>0.0.5</b><br/>
             <ul>
